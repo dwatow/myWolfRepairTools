@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>野狼傳奇 125 線路圖</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <h1 id="diagram-title">野狼傳奇 125 線路圖</h1>
+  <div class="group seg" id="diagram-switch" role="group" aria-label="切換線路圖"></div>
+  <p class="hint">點元件會亮起所有連到它的線，點線只亮那一條；按住 Shift 再點可多選；拖曳平移，滾輪或雙指縮放。</p>
+</header>
+
+<div class="toolbar">
+  <div class="group">
+    <button class="btn" id="zoom-out" type="button" aria-label="縮小">−</button>
+    <button class="btn" id="zoom-fit" type="button">符合視窗</button>
+    <button class="btn" id="zoom-in" type="button" aria-label="放大">＋</button>
+  </div>
+  <label class="toggle"><input type="checkbox" id="hide-ground"> 隱藏接地線</label>
+  <label class="toggle"><input type="checkbox" id="show-codes" checked> 依線色上色</label>
+  <label class="toggle"><input type="checkbox" id="dim"> 淡化底圖</label>
+</div>
+
+<main>
+  <div class="viewer" id="viewer">
+    <canvas id="view"></canvas>
+    <div class="status" id="status">滑過元件或線條可預覽</div>
+    <div class="loading" id="loading">正在分析線路…</div>
+  </div>
+  <aside>
+    <section class="selection" aria-live="polite">
+      <h2>目前選取</h2>
+      <p class="what" id="sel-what">無</p>
+      <p class="meta" id="sel-meta">點圖上的元件或線條，或從下方元件清單挑一個。</p>
+      <div class="group" id="sel-actions" hidden>
+        <div class="swatches small" id="swatches" role="group" aria-label="把選取的線塗上顏色"></div>
+      </div>
+      <div class="group" id="sel-actions2" hidden>
+        <button class="btn" id="sel-zoom" type="button">放大到選取範圍</button>
+        <button class="btn" id="sel-clear" type="button">取消選取</button>
+      </div>
+    </section>
+    <details open>
+      <summary>已儲存的選取</summary>
+      <div class="save-row">
+        <input type="text" id="save-name" placeholder="名稱（例如：充電系統）" aria-label="選取範圍名稱">
+      </div>
+      <div class="group save-actions">
+        <button class="btn" id="add-btn" type="button" disabled>新增</button>
+        <button class="btn" id="update-btn" type="button" disabled>修改</button>
+        <button class="btn" id="delete-btn" type="button" disabled>刪除</button>
+      </div>
+      <p class="save-msg" id="save-msg" role="status"></p>
+      <ul class="list saved" id="saved"></ul>
+      <p class="empty" id="saved-empty">Shift＋點選多條線後，取個名字按「新增」；之後可再載入、修改或刪除，也能匯出 JSON 檔。</p>
+      <div class="group save-actions io">
+        <button class="btn" id="import-btn" type="button">匯入 JSON</button>
+        <button class="btn" id="export-btn" type="button" disabled>匯出 JSON</button>
+        <button class="btn" id="wipe-btn" type="button" disabled>清空</button>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
+      </div>
+    </details>
+    <details open id="switches" hidden>
+      <summary>開關導通表</summary>
+      <select id="switch-select" aria-label="選擇開關"></select>
+      <table class="switch-table" id="switch-table"></table>
+      <p class="switch-msg" id="switch-msg" role="status"></p>
+    </details>
+    <details open>
+      <summary>線色對照</summary>
+      <ul class="legend" id="legend"></ul>
+    </details>
+    <details open>
+      <summary>元件</summary>
+      <div class="comps" id="comps"></div>
+    </details>
+    <details open>
+      <summary>已著色線路</summary>
+      <ul class="list" id="list"></ul>
+      <p class="empty" id="empty">選取元件或線條後，點上面的色票就能把它塗色保留下來。</p>
+      <button class="btn" id="clear" type="button" hidden>全部清除</button>
+    </details>
+    <p class="note">線路是從掃描圖自動辨識：有圓點的交會處視為相連，沒有圓點的交叉視為不相連，並會跨過文字標籤與接頭。線色依圖上的標籤人工判讀，不同線色的線不會被連在一起；接地線為 G（綠）線。少數地方可能誤連或斷開，請對照原圖判讀。</p>
+  </aside>
+</main>
+
+<script src="js/nets.js"></script>
+<script src="js/diagrams.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
