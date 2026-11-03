@@ -1,5 +1,5 @@
 // 用真的 Chrome（headless）載入 index.html 驗收：瀏覽器的 JPEG 解碼與 Node 有差，最終以這個為準
-// node acceptance.js [額外檢查點 x,y=x,y …]  例：1042,831=1050,837 → 兩點須屬同一線路網
+// node acceptance.js [額外檢查點 x,y=x,y …]  例：100,200=130,200 → 兩點須屬同一線路網
 const fs = require('fs'), path = require('path'), { execFileSync } = require('child_process');
 const { PROJECT, WORK, DIAGRAM, SELECTIONS } = require('./lib');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';

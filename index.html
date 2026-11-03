@@ -50,6 +50,11 @@
       <div class="save-row">
         <input type="text" id="save-name" placeholder="名稱（例如：充電系統）" aria-label="選取範圍名稱">
       </div>
+      <div class="group save-actions detail-row">
+        <label class="toggle"><input type="checkbox" id="detail-mode" disabled> 圈選細節</label>
+        <button class="btn" id="detail-undo" type="button" disabled>復原一框</button>
+        <button class="btn" id="detail-clear" type="button" disabled>清除圈選</button>
+      </div>
       <div class="group save-actions">
         <button class="btn" id="add-btn" type="button" disabled>新增</button>
         <button class="btn" id="update-btn" type="button" disabled>修改</button>
@@ -57,7 +62,7 @@
       </div>
       <p class="save-msg" id="save-msg" role="status"></p>
       <ul class="list saved" id="saved"></ul>
-      <p class="empty" id="saved-empty">Shift＋點選多條線後，取個名字按「新增」；之後可再載入、修改或刪除，也能匯出 JSON 檔。</p>
+      <p class="empty" id="saved-empty">Shift＋點選多條線後，取個名字按「新增」。勾「圈選細節」後在圖上拖曳畫框，框到的線段會反色標示，存檔時另存一筆同名的「細節」；之後可再載入、修改或刪除，也能匯出 JSON 檔。</p>
       <div class="group save-actions io">
         <button class="btn" id="import-btn" type="button">匯入 JSON</button>
         <button class="btn" id="export-btn" type="button" disabled>匯出 JSON</button>

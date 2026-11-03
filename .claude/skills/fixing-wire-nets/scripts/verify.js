@@ -1,14 +1,14 @@
 // 驗收＋副作用：每個接線單元的 pick 落在幾段線路網；與修改前相比新增了哪些合併
-// node verify.js [修改前的資料夾（含 js/、data/<圖>/）]
-//   備份有 data/<圖>/strips.js 時，修改前用備份的底圖（可比對改底圖前後）；沒有就兩邊都用專案目前的底圖
-//   新合併印出「接點」：被併在一起的兩段舊線路網之間最近的位置，用 crop.js 看這裡
+// node verify.js [修改前的基準：git ref（HEAD、`git stash create` 的快照）或資料夾（含 js/、data/<圖>/）]
+//   基準有 data/<圖>/strips.js 時，修改前用備份的底圖（可比對改底圖前後）；沒有就兩邊都用專案目前的底圖
+//   新合併比對全圖（不限接線單元），印出「接點」：被併在一起的兩段舊線路網之間最近的位置，用 crop.js 看這裡
 const fs = require('fs'), path = require('path');
-const { SELECTIONS, DIAGRAM, loadImage, analyze } = require('./lib');
-const base = process.argv[2] && path.resolve(process.argv[2]);
+const { SELECTIONS, DIAGRAM, loadImage, analyze, countNets, resolveBase } = require('./lib');
+const base = resolveBase(process.argv[2]);
 const img = loadImage(), W = img.width, neu = analyze(img);
 const oldImg = base && fs.existsSync(path.join(base, 'data', DIAGRAM, 'strips.js')) ? loadImage(base) : img;
 const old = base && analyze(oldImg, base);
-if (base) console.log(`修改前：${oldImg === img ? '專案目前的底圖' : '備份的底圖'}＋備份的資料`);
+if (base) console.log(`修改前：${process.argv[2]}（${oldImg === img ? '底圖用專案目前的' : '含底圖'}）`);
 const sel = fs.existsSync(SELECTIONS) ? require(SELECTIONS) : (console.log(`（沒有 ${path.basename(SELECTIONS)}，只比對合併）`), { selections: [] });
 const count = (r, s) => new Set(s.nets.map(([x, y]) => r.label[y * W + x]).filter(k => k >= 0)).size;
 let ok = true;
@@ -17,8 +17,7 @@ for (const s of sel.selections) {
   const n = count(neu, s); ok &&= n === 1;
   console.log(`${n === 1 ? 'PASS' : 'FAIL'} ${s.name}: ${n} 段${old ? `（修改前 ${count(old, s)} 段）` : ''}`);
 }
-const roots = r => new Set(r.segs.filter(s => s.net >= 0).map(s => s.net)).size;
-console.log(`線路網：${old ? roots(old) + ' → ' : ''}${roots(neu)}`);
+console.log(`線路網：${old ? countNets(old) + ' → ' : ''}${countNets(neu)}`);
 if (old) {
   // 新線路網 → { 舊線路網 → 落在其中的舊線段 }
   const key = s => [s.x0, s.y0, s.x1, s.y1].join();

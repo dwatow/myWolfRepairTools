@@ -12,9 +12,11 @@ function analyzeNets(img, opt = {}) {
   const anchors = opt.anchors ?? [];    // 線色標註點 [x, y, 代號]
   const loose = opt.loose ?? 12;        // 有線色可把關時，間隙門檻可再放寬多少
   const dots = opt.dots ?? [];          // 人工補的接點 [x, y]：圓點偏離交會點中心、自動判斷不到的地方
-  const links = opt.links ?? [];        // 人工補的連線 [[x, y], …]：沿圖上實際走線的折線，頭尾兩點所在的線路網視為相連，沿線墨水也歸入（錯位下折、接頭內部跨接等）
+  const links = opt.links ?? [];        // 人工補的連線 [[x, y], …]：沿圖上實際走線的折線，頭尾兩點所在的線路網視為相連，沿線墨水也歸入（錯位下折等）；只有兩點時只合併不描線（接頭內部跨接、併接）
   const bridgeMax = opt.bridgeMax ?? 140; // 水平穿過接頭（可能連同線色標籤）的缺口上限：兩邊線色都已知且相同才可跨越
   const trackTol = opt.trackTol ?? 2;   // 共線判定容許的錯位（px）
+  const erase = opt.erase ?? [];        // 人工抹除 [x0, y0, x1, y1]：元件符號被誤認成導線的筆畫，辨識前就當成空白
+  const inkFix = opt.ink ?? [];         // 人工補墨 [x0, y0, x1, y1]：顏色太淡、沒被二值化成墨水的導線，辨識前補成墨水
 
   // 1. 二值化：深色或有彩度的像素都算墨水（含灰線）
   const ink = new Uint8Array(W * H);
@@ -24,6 +26,8 @@ function analyzeNets(img, opt = {}) {
     const lum = 0.299 * r + 0.587 * g + 0.114 * b;
     ink[i] = lum < 185 || mx - mn > 70 ? 1 : 0;
   }
+  for (const [rects, v] of [[erase, 0], [inkFix, 1]]) for (const [x0, y0, x1, y1] of rects)
+    for (let y = Math.max(0, y0); y <= Math.min(H - 1, y1); y++) ink.fill(v, y * W + Math.max(0, x0), y * W + Math.min(W - 1, x1) + 1);
 
   // 2. 找線段：逐列（或逐行）找長度 ≥ minRun 的連續墨水，再把相鄰列重疊的 run 合成一條線段
   function segments(horizontal) {
@@ -170,8 +174,10 @@ function analyzeNets(img, opt = {}) {
     for (let y = s.y0; y <= s.y1; y++) for (let x = s.x0; x <= s.x1; x++) if (ink[y * W + x]) label[y * W + x] = r;
   }
   // 人工連線的走線（下折、轉折等不夠長、沒被認成線段的筆畫）：折線 ±linkHalf 範圍內尚未歸屬的墨水像素
+  // 只有頭尾兩點的連線（接頭內部跨接、併接）只合併、不描線，免得把接頭符號的筆畫塗上線色
   const linkHalf = 3;
   for (const [path, a] of linkSegs) {
+    if (path.length === 2) continue;
     const r = find(a.id);
     for (let j = 1; j < path.length; j++) {
       const [ax, ay] = path[j - 1], [bx, by] = path[j], n = Math.max(Math.abs(bx - ax), Math.abs(by - ay), 1);

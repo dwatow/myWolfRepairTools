@@ -43,7 +43,7 @@ function loadImage(dir = PROJECT) {
   return { data, width: IW, height: IH };
 }
 
-// dir：含 js/nets.js、data/<圖>/ 的資料夾（預設專案本身；比對時可傳修改前的備份）
+// dir：含 js/nets.js、data/<圖>/ 的資料夾（預設專案本身；比對時傳 resolveBase 取出的基準）
 // 舊版備份沒有 data/<圖>/fixes.js，改從 js/app.js 的 DOTS／LINKS 讀
 function analyze(img, dir = PROJECT) {
   let fixes;
@@ -57,10 +57,19 @@ function analyze(img, dir = PROJECT) {
   // 線色標註也從 dir 讀（比對時才會用到修改前的 anchors.js）；舊備份沒有就退回專案本身
   const anchorDir = fs.existsSync(path.join(dir, DATA, 'anchors.js')) ? dir : PROJECT;
   const anchors = loadWindow([`${DATA}/anchors.js`], anchorDir).WOLF_ANCHORS;
-  const r = require(file).analyzeNets(img, { anchors, dots: fixes.dots || [], links: fixes.links || [] });
+  const r = require(file).analyzeNets(img, { anchors, dots: fixes.dots || [], links: fixes.links || [], erase: fixes.erase || [], ink: fixes.ink || [] });
   addCables(r, fixes.cables || [], img.width, img.height, dir);
+  // 同 app.js：固定區域（staticAreas）與元件名稱文字範圍內的像素不算線路
+  const compDir = fs.existsSync(path.join(dir, DATA, 'components.js')) ? dir : PROJECT;
+  const comps = loadWindow([`${DATA}/components.js`], compDir).WOLF_COMPONENTS || [], K = img.width / 1800;
+  const areas = [...(fixes.staticAreas || []), ...comps.filter(c => c.label).map(c => c.label.map(v => Math.round(v * K)))];
+  for (const [x0, y0, x1, y1] of areas)
+    for (let y = Math.max(0, y0); y <= Math.min(img.height - 1, y1); y++) r.label.fill(-1, y * img.width + Math.max(0, x0), y * img.width + Math.min(img.width - 1, x1) + 1);
   return r;
 }
+
+// 線路網數：有像素的線路網（與 app.js 的 nets.length、acceptance.js 的 nets: 相同算法）
+function countNets(r) { const s = new Set(); for (const k of r.label) if (k >= 0) s.add(k); return s.size; }
 
 // 粗電纜：路徑範圍內的像素整塊歸給該電纜（與 js/app.js 的 addCables 相同；半寬預設讀 app.js 的 CABLE_HALF）
 function addCables(r, cables, IW, IH, dir) {
@@ -78,4 +87,20 @@ function addCables(r, cables, IW, IH, dir) {
   });
 }
 
-module.exports = { PROJECT, WORK, DIAGRAM, SELECTIONS, loadImage, analyze };
+// 修改前的基準：可以是資料夾，或 git ref（HEAD、commit、`git stash create` 的快照）
+// git ref 會用 git archive 把 js/ 和 data/<圖>/ 取到 WORK/base-<commit>（commit 不會變，取過就重用）
+function resolveBase(arg) {
+  if (!arg) return null;
+  if (fs.existsSync(arg) && fs.statSync(arg).isDirectory()) return path.resolve(arg);
+  const { execFileSync } = require('child_process'), git = (...a) => execFileSync('git', ['-C', PROJECT, ...a], { encoding: 'utf8' }).trim();
+  let sha; try { sha = git('rev-parse', '--verify', '--quiet', arg + '^{commit}'); } catch { console.error(`找不到資料夾或 git ref：${arg}`); process.exit(2); }
+  const dir = path.join(WORK, `base-${sha.slice(0, 12)}`);
+  if (!fs.existsSync(path.join(dir, DATA))) {
+    fs.mkdirSync(dir, { recursive: true });
+    const tar = execFileSync('git', ['-C', PROJECT, 'archive', sha, 'js', DATA], { maxBuffer: 1 << 28 });
+    execFileSync('tar', ['-x', '-C', dir], { input: tar });
+  }
+  return dir;
+}
+
+module.exports = { PROJECT, WORK, DIAGRAM, SELECTIONS, loadImage, analyze, countNets, resolveBase };

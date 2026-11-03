@@ -20,25 +20,29 @@ description: Use when the scanned base image of a wiring diagram in this viewer 
    - 參考圖若是 PDF，先用 `pdfimages -list` 找出內嵌的線路圖，再用 `pdfimages -j` 取出原檔（不要用 `pdftoppm` 重新算圖）。用 `node $E/crop-ref.js <in.jpg> <out.png> x0 y0 x1 y1 [倍率]` 放大來看。
    - 兩張圖的版面間距常常不同（例如 PA12B 中文版和 PA12C 英文版的儀錶組），不能整塊貼過去，要**依接線關係**比對：哪個元件、哪支腳、接到哪條線、交會處有沒有圓點。
 2. **量座標**：`DIAGRAM=<圖> node $E/measure.js <模式> …`，各模式見檔頭說明。
+   - 先找大概位置：要改的字是元件名稱的話，看 `components.js` 的 `label`，它以圖寬 1800 為準，要乘 3323/1800 換成畫面座標；不是元件名稱的話，用 `crop.js` 大範圍、低倍率掃過去找。
    - `rows`、`cols`：找橫線、直線的位置（線寬約 2 px）。
    - `runs`：把字逐字切開。
    - `map`：字元圖。
    - `rgb`：取色。
 3. **寫編輯腳本**：建一個 ops.js，使用 `$E/edit-base.js` 提供的工具（見檔頭）：
-   - 擦除：`white`；`eraseH` 擦橫線、保留穿過去的直線；`eraseV` 擦直線、保留穿過去的橫線。
+   - 擦除：`white`；`eraseH` 擦橫線、保留穿過去的直線；`eraseV` 擦直線、保留穿過去的橫線。三者都用周圍的紙色填，不是純白。
    - 搬移：`copy`、`paste`。
    - 畫線：`fill`。
-   - 寫字：`fitFont`、`drawText`、`drawCentered`。
+   - 寫字：`fitFont`、`drawText`、`drawCentered`；`compare` 把幾個候選字在原位試寫，和原圖上下排成一張比較圖。
 4. **預覽**：`DIAGRAM=<圖> node $E/edit-base.js ops.js --preview x,y,w,h,4 --out <預覽.png>`，用 Read 看。
    - 第 5 個數字是放大倍率；看字形用 4 倍，看接線用 1～2 倍、範圍含周邊的線。
-   - `--out` 不給時寫到 `$WORK/preview-<圖>.png`，多個工作同時跑會互相覆蓋。
+   - `--out` 不給時寫到 `$WORK/preview-<圖>.png`，多個工作同時跑會互相覆蓋。ops.js 呼叫了 `compare` 時，比較圖寫到同一路徑的 `-compare.png`。
 5. **寫回**：
-   - 先把 `js/` 和 `data/<圖>/` 複製到一個備份資料夾（第 7 步要用）。
+   - 先記下基準：`BASE=$(git stash create); BASE=${BASE:-HEAD}`（第 7 步要用；做法同 `fixing-wire-nets` 第 3 步）。
    - 同一個指令加上 `--apply`。改到的橫條會**整條**重新編碼（JPEG 品質 1），所以範圍外也會有 1 px 等級的變化。
 6. **同步資料**：線移動或刪除後，修改 `anchors.js` 對應的線色標註（移到新位置，或刪除）。元件改名時，也要檢查 `components.js`。
 7. **驗收**（兩步都要做，只改字也一樣）：
-   - `DIAGRAM=<圖> node $F/verify.js <備份資料夾>`：修改前用備份的底圖和資料，修改後用專案目前的。每一筆「新合併」和線路網數的增減，都要對得上這次的修改；對不上的用它印出的「接點」座標 crop 看。原本的接線單元要仍然是 1 段。
+   - `DIAGRAM=<圖> node $F/verify.js $BASE`：修改前用基準的底圖和資料，修改後用專案目前的。每一筆「新合併」和線路網數的增減，都要對得上這次的修改；對不上的用它印出的「接點」座標 crop 看。原本的接線單元要仍然是 1 段。
+   - 只改字時線段數也常不同，再跑 `DIAGRAM=<圖> node $F/diff.js $BASE`，確認列出的線段都在修改範圍內。
    - `DIAGRAM=<圖> node $F/acceptance.js x,y=x,y …`：新的線和該接的線屬於同一個線路網，線色代號正確。這張圖若還沒有接線單元匯出檔，就只檢查你給的檢查點。
+     - 有改線：檢查點取新線的兩端，以及它該接上的線。
+     - 只改字：取字旁邊那個元件每支腳的出線，每支腳在引線上取兩點，確認仍是 1 段。
 
 ## 做法速查
 | 要做的事 | 做法 |
@@ -48,7 +52,7 @@ description: Use when the scanned base image of a wiring diagram in this viewer 
 | 刪除 T 接點、改成轉角 | 把圓點範圍清白，再從外側取線色，補回兩段線 |
 | 改英數字 | 先用 `fitFont` 比對字型（試 `italic bold {size} "Arial Narrow"` 等，可加水平縮放 `sxs`），擦掉原字，在同一個字型原點寫新字 |
 | 改中文標籤 | 圖上有大小、粗細都相同的現成字就拼（例：「指示燈」取自同一排的「遠光指示燈」）；大小或粗細不同就不要拼，改寫新字 |
-| 寫新的中文字 | `fitFont` 對細筆畫中文不可靠（比對分數只有 0.35～0.71），只拿來縮小字型、字級範圍；實際用 4 倍預覽並排比較幾個候選再決定（這張圖常用 `200 {size} "Hiragino Sans GB"`，約 15 px）。先量舊字範圍、擦掉，再用 `drawCentered(字, f, 舊字範圍)` 寫 |
+| 寫新的中文字 | `fitFont` 對細筆畫中文不可靠（比對分數只有 0.35～0.71），只拿來縮小字型、字級範圍；再用 `compare(字, 候選, 舊字範圍, 含左右字的範圍)` 輸出比較圖，選和左右字最像的（這張圖常用 `200 {size} "Hiragino Sans GB"`，約 15 px）。先量舊字範圍、擦掉，再用 `drawCentered(字, f, 舊字範圍)` 寫 |
 
 ## 常見錯誤
 - **整塊清白，連帶擦斷穿過的線**：曾用 `white` 擦一條直線，結果兩條橫穿過去的線也被擦斷。擦線一律用 `eraseH`／`eraseV`，並預覽確認。
