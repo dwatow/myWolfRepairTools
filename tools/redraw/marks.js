@@ -9,7 +9,8 @@ const CHAR_MIN = 9, CHAR_MAX = 17; // 每個字元沿書寫方向的寬度範圍
 const isInk = (d, p) => { const r = d[p], g = d[p + 1], b = d[p + 2]; return 0.299 * r + 0.587 * g + 0.114 * b < 185 || Math.max(r, g, b) - Math.min(r, g, b) > 70; };
 
 // 不屬於導線（label < 0）、不在 skip 矩形內的墨水連通塊，鄰近的併成一個標記
-function findMarks({ image, label, skip = [] }) {
+// bigNoJoin：長邊超過這個值的塊（外框、長線）不和別的塊合併（元件判讀用，免得框內所有字被併成一塊）
+function findMarks({ image, label, skip = [], bigNoJoin = Infinity }) {
   const { width: W, height: H, data } = image, seen = new Uint8Array(W * H), blobs = [];
   const skipped = (x, y) => skip.some(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d);
   const free = i => isInk(data, i * 4) && label[i] < 0;
@@ -28,6 +29,7 @@ function findMarks({ image, label, skip = [] }) {
   const par = blobs.map((_, i) => i), f = i => par[i] === i ? i : (par[i] = f(par[i]));
   for (let i = 0; i < blobs.length; i++) for (let j = i + 1; j < blobs.length; j++) {
     const a = blobs[i], c = blobs[j];
+    if (Math.max(a.x1 - a.x0, a.y1 - a.y0) > bigNoJoin || Math.max(c.x1 - c.x0, c.y1 - c.y0) > bigNoJoin) continue;
     if (a.x0 - JOIN_X <= c.x1 && c.x0 - JOIN_X <= a.x1 && a.y0 - JOIN_Y <= c.y1 && c.y0 - JOIN_Y <= a.y1) par[f(i)] = f(j);
   }
   const out = new Map();
@@ -133,7 +135,7 @@ function assertDraft(text, force) {
 
 // 文字與單線接頭所在的導線切開留缺口（同原圖；舊辨識把字母的橫筆畫連進了線段）
 // 文字大小以 basemap.js 的粗體 21px 估計：每字 14 px、「/」7 px，高 16，沿線方向兩側再留 CUT_PAD；
-// plug 30×22、socket 45×21 不留白（同原圖，導線直接接到接頭邊緣）。markRects 回傳 [x0, y0, x1, y1, 留白]
+// plug 30×22、socket 45×21 不留白（同原圖，導線直接接到接頭邊緣）；多腳接頭方框切到框邊。markRects 回傳 [x0, y0, x1, y1, 留白]
 const CUT_PAD = 6, MIN_PIECE = 6;
 function markRects(d) {
   const rects = [];
@@ -146,6 +148,8 @@ function markRects(d) {
     const [len, wid] = m.kind === 'plug' ? [30, 22] : [45, 21], [hw, hh] = m.dir === 'v' ? [wid / 2, len / 2] : [len / 2, wid / 2];
     rects.push([...[m.at[0] - hw, m.at[1] - hh, m.at[0] + hw, m.at[1] + hh].map(Math.round), 0]);
   }
+  // 多腳接頭方框（導線上的與元件上的）：框內的導線切掉，導線停在框邊線上（留白 −1 = 切到框邊為止）
+  for (const c of [...(d.connectors || []), ...(d.parts || []).filter(p => p.type === 'connector')]) rects.push([...c.box, -1]);
   return rects;
 }
 function cutWires(d) {

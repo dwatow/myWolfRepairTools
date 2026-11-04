@@ -29,8 +29,8 @@ const near = (lab, [x, y]) => { for (let d = 0; d <= 2; d++) for (let dy = -d; d
 // 同 app.js renderSwitches 的 netOf：接腳座標 4 px 內的線路
 const near4 = (lab, [x, y]) => { for (let r = 0; r <= 4; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const k = lab[(y + dy) * W + x + dx]; if (k >= 0) return k; } return -1; };
 // 例外的 pick 對到哪條舊線路：該點的線路，或某段中點距 pick ≤ 3 px 的線路（中段被電纜蓋過的殘段，label 查不到）
-const excOf = root => EXC.find(e => near(old.label, e.pick) === root ||
-  old.segs.some(s => s.net === root && Math.abs(((s.x0 + s.x1) >> 1) - e.pick[0]) <= 3 && Math.abs(((s.y0 + s.y1) >> 1) - e.pick[1]) <= 3));
+const excOf = root => EXC.find(e => e.pick && (near(old.label, e.pick) === root ||
+  old.segs.some(s => s.net === root && Math.abs(((s.x0 + s.x1) >> 1) - e.pick[0]) <= 3 && Math.abs(((s.y0 + s.y1) >> 1) - e.pick[1]) <= 3)));
 const codeOf = new Map(); for (const s of old.segs) if (s.net >= 0 && s.netCode && !codeOf.has(s.net)) codeOf.set(s.net, s.netCode);
 const P = ([x, y]) => `(${x}, ${y})`;
 let allOk = true;
@@ -55,6 +55,9 @@ for (const x of m.merges) {
 }
 const partialBy = new Map(); for (const x of m.partial) if (!partialBy.has(x.old)) partialBy.set(x.old, x);
 // 段落中點在標記範圍內的（文字與接頭之間的短線，切缺口時一併切掉，同原圖）不算部分沒畫到
+// 個別段落的例外（exceptions.js 裡有 segment 的項目）：只放過那一段，不放過整條線路
+for (const x of m.partial) { const e = EXC.find(e => e.segment && Math.abs(e.segment[0] - x.at[0]) <= 3 && Math.abs(e.segment[1] - x.at[1]) <= 3); if (e) x.excused = e.reason; }
+for (const [k, x] of [...partialBy]) if (m.partial.filter(p => p.old === k).every(p => p.excused)) { lines1.push({ ok: true, text: `部分線段不畫：舊線路 ${codeOf.get(k) || '未標色'} ${P(x.at)}（已確認例外：${x.excused}）` }); partialBy.delete(k); }
 for (const [k, x] of [...partialBy]) if (mRects.some(([a, b, c, d]) => x.at[0] >= a && x.at[0] <= c && x.at[1] >= b && x.at[1] <= d)) partialBy.delete(k);
 for (const x of partialBy.values()) lines1.push(item(x.old, `部分線段沒畫到：舊線路 ${codeOf.get(x.old) || '未標色'} ${P(x.at)}（共 ${m.partial.filter(p => p.old === x.old).length} 段）`));
 report('接線一致', lines1);

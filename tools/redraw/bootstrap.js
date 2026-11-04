@@ -3,9 +3,10 @@
 // 用現有的影像辨識結果（js/nets.js＋data/<圖>/ 的 anchors、fixes、components）轉換，覆寫 data/<圖>/drawing.js
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const { PROJECT, DIAGRAM, loadImage, analyze } = require('../../.claude/skills/fixing-wire-nets/scripts/lib');
-const { netsToDrawing } = require('./draft');
+const { netsToDrawing, tidyNet } = require('./draft');
 const { assertDraft, cutWires, dropMarkStrokes } = require('./marks');
-const { formatDrawing, headerOf } = require('./write-drawing');
+const { formatDrawing, headerOf, KEEP_FIELDS } = require('./write-drawing');
+const { applyNetsManual, MANUAL } = require('./nets-manual');
 
 const load = f => { const c = { window: {} }; vm.runInNewContext(fs.readFileSync(path.join(PROJECT, 'data', DIAGRAM, f), 'utf8'), c); return c.window; };
 const img = loadImage(), r = analyze(img);
@@ -13,14 +14,17 @@ const { drawing, dropped, outlines } = netsToDrawing(r, {
   W: img.width, H: img.height, image: img,
   components: load('components.js').WOLF_COMPONENTS || [], fixes: load('fixes.js').WOLF_FIXES || {},
 });
+// 線路網的人工修正（tools/redraw/nets-manual.js）
+for (const line of applyNetsManual(drawing, MANUAL[DIAGRAM])) console.log('  ' + line);
 const file = path.join(PROJECT, 'data', DIAGRAM, 'drawing.js');
 if (fs.existsSync(file)) {
   const old = fs.readFileSync(file, 'utf8');
   try { assertDraft(old, process.argv.includes('--force')); } catch (e) { console.error(e.message); process.exit(2); }
-  // 保留既有的標記（add-marks.js 產生或手改的），只重產線路網
+  // 保留既有的標記與元件圖元（add-marks.js、add-parts.js 產生或手改的），只重產線路網
   const win = {}; vm.runInNewContext(old, { window: win });
-  for (const f of ['connectors', 'inline', 'labels', 'texts']) drawing[f] = win.WOLF_DRAWING[f] || [];
+  for (const f of KEEP_FIELDS) drawing[f] = win.WOLF_DRAWING[f] || [];
   // 重產的線路網要和標記一致：文字、接頭處切缺口，接頭符號的筆畫移除（同 add-marks.js）
+  for (const net of drawing.nets) tidyNet(net);
   cutWires(drawing); dropMarkStrokes(drawing);
 }
 fs.writeFileSync(file, fs.existsSync(file) ? formatDrawing(drawing, headerOf(fs.readFileSync(file, 'utf8'))) : formatDrawing(drawing)); // 保留既有檔頭（含「已手改」標記）

@@ -102,9 +102,9 @@ function merge(ls) {
   return ls;
 }
 // 端點吸附：lines 的端點靠近垂直方向的 other 線時，移到它的中心線上，並把它延伸到端點的位置
-function snap(lines, other) {
+function snap(lines, other, d = SNAP) {
   for (const l of lines) for (const end of ['a', 'b']) {
-    const t = other.find(o => Math.abs(o.c - l[end]) <= SNAP && l.c >= o.a - SNAP && l.c <= o.b + SNAP);
+    const t = other.find(o => Math.abs(o.c - l[end]) <= d && l.c >= o.a - d && l.c <= o.b + d);
     if (!t) continue;
     l[end] = t.c;
     if (l.c < t.a) t.a = l.c; if (l.c > t.b) t.b = l.c;
@@ -143,4 +143,20 @@ function project(hs, vs, x, y) {
   return best;
 }
 
-module.exports = { netsToDrawing };
+// 整理一條線路的導線（繪製用）：拆成水平／垂直段，同一條線上相差 ≤ 2 px 且重疊或相接的合併，
+// 線端距垂直方向的線 ≤ snapDist 時吸附上去，讓轉角剛好在端點相接（之後才能畫成圓角）。缺口 > 2 px（文字、接頭處）保留
+function tidyNet(net, snapDist = 3) {
+  if (net.cable) return net;
+  const hs = [], vs = [];
+  for (const w of net.wires) for (let j = 1; j < w.length; j++) {
+    const [a, b] = [w[j - 1], w[j]];
+    if (a[1] === b[1] && a[0] !== b[0]) hs.push({ c: a[1], a: Math.min(a[0], b[0]), b: Math.max(a[0], b[0]) });
+    else if (a[0] === b[0] && a[1] !== b[1]) vs.push({ c: a[0], a: Math.min(a[1], b[1]), b: Math.max(a[1], b[1]) });
+  }
+  const H = merge(hs), V = merge(vs);
+  snap(H, V, snapDist); snap(V, H, snapDist);
+  net.wires = [...H.filter(l => l.b > l.a).map(l => [[l.a, l.c], [l.b, l.c]]), ...V.filter(l => l.b > l.a).map(l => [[l.c, l.a], [l.c, l.b]])];
+  return net;
+}
+
+module.exports = { netsToDrawing, tidyNet };

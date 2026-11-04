@@ -153,3 +153,30 @@ test('兩端各在不同框內、中段在框外的未標色導線不移除', ()
     connectors: [{ label: '', box: [10, 40, 30, 60] }, { label: '', box: [170, 40, 190, 60] }], labels: [], inline: [] };
   assert.equal(dropMarkStrokes(d), 0);
 });
+
+test('只改寫 parts', () => {
+  const { applyParts, formatDrawing } = require('../redraw/write-drawing.js');
+  const d = applyParts({ size: [1, 1], nets: [{ code: 'B', wires: [] }], labels: [{ text: 'B', at: [0, 0] }], parts: [] }, [{ type: 'text', text: 'a', at: [1, 2] }, { type: 'frame', box: [0, 0, 1, 1] }]);
+  assert.deepEqual(d.nets, [{ code: 'B', wires: [] }]);
+  assert.deepEqual(d.labels, [{ text: 'B', at: [0, 0] }]);
+  assert.equal(d.parts.length, 2);
+  const out = formatDrawing(d);
+  assert.match(out, /\n  parts: \[\n    \{"type":"text","text":"a","at":\[1,2\]\},\n    \{"type":"frame"/);
+});
+
+test('bootstrap 重產線路網時保留的欄位含 parts', () => {
+  const { KEEP_FIELDS } = require('../redraw/write-drawing.js');
+  assert.deepEqual(KEEP_FIELDS, ['connectors', 'inline', 'labels', 'texts', 'parts']);
+  assert.match(require('fs').readFileSync(require('path').join(__dirname, '../redraw/bootstrap.js'), 'utf8'), /for \(const f of KEEP_FIELDS\)/);
+});
+
+test('穿過多腳接頭方框的導線切在框邊', () => {
+  const { cutWires } = require('../redraw/marks.js');
+  const d = { size: [W, H], nets: [{ code: 'B', wires: [[[0, 50], [199, 50]], [[0, 80], [60, 80]]] }],
+    labels: [], inline: [], connectors: [{ label: '3P', box: [40, 30, 70, 90] }],
+    parts: [{ type: 'connector', label: '2P', box: [150, 40, 170, 60] }] };
+  cutWires(d);
+  const h = y => d.nets[0].wires.filter(w => w[0][1] === y).map(w => [w[0][0], w[1][0]]);
+  assert.deepEqual(h(50), [[0, 40], [70, 150], [170, 199]]);
+  assert.deepEqual(h(80), [[0, 40]]);
+});
