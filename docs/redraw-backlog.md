@@ -51,14 +51,18 @@
 
 ## 二、後續階段
 
-### 第 4 階段：移除原圖
+### 第 4 階段：移除原圖（進行中）
 
-- 刪除 `data/PA12B/strips.js`、`data/PA12C/strips.js`。
-- 移除開發用的原圖對照開關（網址參數 `?dev=1`）。
-- 移除 `fixes.js` 的 `staticAreas`，以及 `js/nets.js` 在執行時的載入。
-- 決定 `legacy.js`（舊塗色轉移用）要不要保留。
-- **改寫 git 歷史**，把 `strips.js` 從所有 commit 移除。repo 目前設為私人，完成這一步之後才能改回公開。
-- 驗收：設計文件「驗收」的 4～6 項。
+計畫：`docs/superpowers/plans/2026-11-04-redraw-phase4-remove-original.md`
+
+- 已完成（`redraw-phase4` 分支）：
+  - 網頁不再載入 `strips.js`、`js/nets.js`、`anchors.js`、`fixes.js`，移除 `?dev=1` 原圖對照與 `staticAreas` 的執行期使用。
+  - `strips.js` 移出 git，加進 `.gitignore`，只留在本機給比對工具用（使用者決定）。
+  - `sheet.js` 改為自己載入本機原圖；沒有原圖時，比對工具顯示說明。
+  - `legacy.js` 保留（只有座標；使用者瀏覽器裡的舊版塗色要靠它轉移）。
+- 待做：
+  - 改寫 git 歷史（`git filter-repo`），把 `strips.js` 從所有 commit 移除。
+  - 由 `dwatow` 刪除並重建同名 repo（PR 紀錄會留住舊 commit），推上乾淨的歷史，確認後改回公開。
 
 ### 第 5 階段：工具與文件
 
