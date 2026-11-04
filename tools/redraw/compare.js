@@ -1,7 +1,7 @@
 // 驗收 1～3（Node）：DIAGRAM=<圖> node tools/redraw/compare.js
 // 以影像辨識結果為基準，檢查 data/<圖>/drawing.js 點陣化後：接線一對一、既有參照找得回、線色一致。任一項失敗結束碼 1
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const { PROJECT, DIAGRAM, SELECTIONS, loadImage, analyze } = require('../../.claude/skills/fixing-wire-nets/scripts/lib');
+const { PROJECT, DIAGRAM, SELECTIONS, loadImage, analyze } = require('./lib');
 const { rasterizeDrawing } = require('../../js/drawing.js');
 const { netsToDrawing } = require('./draft');
 const { matchNets } = require('./match');

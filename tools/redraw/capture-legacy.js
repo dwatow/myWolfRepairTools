@@ -2,7 +2,7 @@
 // 必須在網頁改由 drawing.js 產生線路「之前」、在 Chrome 裡執行（舊塗色存的是 Chrome 裡的線路編號，Node 解碼略有差異）
 // 輸出 data/<圖>/legacy.js：window.WOLF_LEGACY = { n, picks }，picks[k] 是舊線路 k 上的一點
 const fs = require('fs'), path = require('path');
-const { PROJECT, DIAGRAM } = require('../../.claude/skills/fixing-wire-nets/scripts/lib');
+const { PROJECT, DIAGRAM } = require('./lib');
 const { evalInPage } = require('./chrome');
 
 const out = evalInPage(() => {

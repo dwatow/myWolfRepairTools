@@ -2,7 +2,7 @@
 //   每區輸出 <前綴>-<i>.png，左原圖、右新圖（新圖含依線色上色）。--sample：改畫 tools/redraw/sample-marks.js（只有新圖）
 const fs = require('fs');
 const { evalInPage } = require('./chrome');
-const { originalFile } = require('../../.claude/skills/fixing-wire-nets/scripts/lib');
+const { originalFile } = require('./lib');
 const [D, out, ...rest] = process.argv.slice(2), sample = rest.includes('--sample'), regions = rest.filter(a => a !== '--sample');
 const fn = sample
   ? new Function(`return (() => { const d = ${JSON.stringify(require('./sample-marks'))};

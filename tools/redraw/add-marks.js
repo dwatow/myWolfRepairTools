@@ -3,7 +3,7 @@
 // 從原圖找出導線上的線色文字、單線接頭、多腳接頭，改寫 data/<圖>/drawing.js 的 connectors／inline／labels／texts（nets 不動）
 // 無法自動判定的寫到 $WORK/<圖>-marks-review.json，由人工看原圖補上
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const { PROJECT, WORK, DIAGRAM, loadImage } = require('../../.claude/skills/fixing-wire-nets/scripts/lib');
+const { PROJECT, WORK, DIAGRAM, loadImage } = require('./lib');
 const { rasterizeDrawing } = require('../../js/drawing.js');
 const { findMarks, attach, assertDraft, cutWires, dropMarkStrokes } = require('./marks');
 const { formatDrawing, headerOf } = require('./write-drawing');
