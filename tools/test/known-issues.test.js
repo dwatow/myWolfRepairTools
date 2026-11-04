@@ -48,3 +48,27 @@ test('電纜預設半寬只定義在 js/drawing.js', () => {
   assert.ok(!/\?\? 7\b/.test(read('js/basemap.js')), 'basemap.js 不應寫死 ?? 7');
   assert.ok(!/const CABLE_HALF/.test(read('js/app.js')), 'app.js 不應另外定義 CABLE_HALF');
 });
+
+test('pinNets：開關接腳 ±4 px 內的線路與線色，找不到時 k 為 -1', () => {
+  const { pinNets } = require('../redraw/pin-nets.js');
+  const drawing = { size: [40, 40], nets: [{ code: 'B/W', wires: [[[10, 0], [10, 39]]] }] };
+  const switches = [{ name: '主開關', pins: { IG: [12, 20], E: [30, 20] } }];
+  assert.deepEqual(pinNets(drawing, switches), [
+    { sw: '主開關', pin: 'IG', at: [12, 20], k: 0, code: 'B/W' },
+    { sw: '主開關', pin: 'E', at: [30, 20], k: -1, code: null },
+  ]);
+});
+
+test('unknownComponents：comp-highlight 的元件名稱打錯時列出', () => {
+  const { unknownComponents } = require('../redraw/comp-highlight.js');
+  const comps = [{ name: '頭燈' }, { name: '喇叭' }];
+  assert.deepEqual(unknownComponents(['頭燈', '大燈'], comps), ['大燈']);
+  assert.deepEqual(unknownComponents(['喇叭'], comps), []);
+});
+
+test('adding-switch-tables 不再用舊辨識找接腳、說明不再寫 PA12C 沒有開關表', () => {
+  const md = read('.claude/skills/adding-switch-tables/SKILL.md');
+  assert.ok(!md.includes('which has none yet'), 'description 不應寫 PA12C 沒有開關表');
+  assert.ok(!/analyze/.test(md), '不應再用舊辨識 analyze 找接腳');
+  assert.ok(md.includes('tools/redraw/pin-nets.js'), '要用 pin-nets.js 確認接腳的線路');
+});

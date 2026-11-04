@@ -1,6 +1,6 @@
 ---
 name: adding-switch-tables
-description: Use when adding or correcting the switch continuity tables (方向燈開關、喇叭開關、主開關… the 開關導通表 panel) for a diagram in this wiring-diagram viewer, i.e. creating or editing data/<diagram>/switches.js — for example PA12C, which has none yet.
+description: Use when adding or correcting the switch continuity tables (方向燈開關、喇叭開關、主開關… the 開關導通表 panel) for a diagram in this wiring-diagram viewer, i.e. creating or editing data/<diagram>/switches.js, or when a switch pin lights the wrong wire or none.
 ---
 
 # 加入開關導通表
@@ -13,8 +13,9 @@ description: Use when adding or correcting the switch continuity tables (方向�
 2. **逐張讀表**：表頭是接腳，每列是一個檔位；同一列兩個黑點之間連線，代表這兩支接腳導通。
 3. **寫資料**：`data/<圖>/switches.js`，格式如下。
 4. **對應接腳到線路**（`pins`，讓點檔位時圖上亮起導通的線）：開關元件在線路圖上的每支接腳都有標籤（如 `HO E LO HI TL R L W`），從接腳往外拉出的導線上取一點的座標。
-   - 找座標：用 `tools/redraw/lib.js`（`loadImage`／`analyze`）列出端點落在接腳附近的垂直線段，印出 `x0, y0, y1, netCode`；再 crop 接腳標籤，確認接腳和線的對應順序。
-   - 取點：選在線段中段、離接腳圓圈幾 px 的地方（例：PA12B 底部接腳用 y=1745）。程式會在 ±4 px 內找最近的線路像素。
+   - 找座標：網頁是用重繪資料（`data/<圖>/drawing.js` 的 `nets`）找線路。先在 `nets` 裡找出從接腳往外拉出的導線（垂直折線，端點在接腳圓圈附近），再用 `node tools/redraw/sheet.js <圖> <scratch>/p x,y,w,h,倍率` 對照原圖的接腳標籤，確認接腳和線的對應順序。
+   - 取點：選在導線中段、離接腳圓圈幾 px 的地方（例：PA12B 底部接腳用 y=1745）。不要取在線色文字或接頭附近，重繪時那裡的導線會切出缺口。
+   - 確認：`node tools/redraw/pin-nets.js <圖>` 列出每支接腳落在哪條線路與線色（規則同網頁：±4 px 內）。有 ✗（找不到線路）或線色不合理就改座標。
    - 同一支接腳可以出現在兩張表（例：燈光開關與起動開關共用 BAT2），座標相同。
 5. **驗收**：用 headless Chrome 開 `index.html?d=<圖>`。
    - `--dump-dom`：確認 `id="switches"` 沒有 `hidden`，下拉選單有每個開關的 `<option>`。
@@ -47,6 +48,6 @@ window.WOLF_SWITCHES = [
 - **少一張開關表**：檔位全都不導通的開關（例如只有 OFF/ON 兩列，但 OFF 沒點）也要寫進去，不能因為「沒資料」就跳過。
 - **把中間的接腳算成導通**：主開關 ON 的 BAT1–BAT2 不經過 IG，但如果有一條線從 BAT1 拉到 IG，中間跨過的 BAT2 也不算導通。只有頭尾兩點畫了圓點的接腳才算。
 - **改 `app.js` 來適應某張圖**：表格的欄數、列數都由資料決定；遇到畫不出來的情況，先確認資料格式是否正確。
-- **`pins` 對錯接腳**：接腳標籤是直書，順序容易看錯。一定要對照接出的線色（例：PA12B 主開關 IG＝B/W、BAT1＝R、BAT2＝B、E＝G），且表頭接腳下方顯示的線色要合理。
+- **`pins` 對錯接腳**：接腳標籤是直書，順序容易看錯。一定要用 `pin-nets.js` 對照接出的線色（例：PA12B 主開關 IG＝B/W、BAT1＝R、BAT2＝B、E＝G）。
 - **`pins` 點在元件框線上**：框線不屬於任何線路網，或屬於別的網。點要取在接腳外、導線本身上。
 - **沒有開關表的圖**：不用建空檔。`switches.js` 可以省略，載入失敗會被忽略，側欄這一區會自動隱藏。
