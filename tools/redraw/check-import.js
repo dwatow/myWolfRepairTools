@@ -5,7 +5,7 @@ const { evalInPage } = require('./chrome');
 
 const D = 'PA12B', win = {};
 vm.runInNewContext(fs.readFileSync(path.join(PROJECT, 'data', D, 'legacy.js'), 'utf8'), { window: win });
-const pick = win.WOLF_LEGACY.picks[0];
+const pick = win.WOLF_LEGACY.picks.find(p => p); // null = 新圖不畫的筆畫
 let ok = true;
 const check = (name, cond, got) => { ok &&= cond; console.log(`${cond ? 'PASS' : 'FAIL'} ${name}${cond ? '' : '：' + JSON.stringify(got).slice(0, 300)}`); };
 

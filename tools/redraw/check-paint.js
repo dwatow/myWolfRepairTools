@@ -7,7 +7,7 @@ const { evalInPage } = require('./chrome');
 const D = 'PA12B', win = {};
 for (const f of ['drawing', 'legacy']) vm.runInNewContext(fs.readFileSync(path.join(PROJECT, 'data', D, f + '.js'), 'utf8'), { window: win });
 const L = win.WOLF_LEGACY, W = win.WOLF_DRAWING.size[0], lab = rasterizeDrawing(win.WOLF_DRAWING, { cableHalf: 7 }).label;
-const k = L.picks.findIndex(([x, y]) => lab[y * W + x] >= 0), want = lab[L.picks[k][1] * W + L.picks[k][0]];
+const k = L.picks.findIndex(p => p && lab[p[1] * W + p[0]] >= 0), want = lab[L.picks[k][1] * W + L.picks[k][0]];
 const V3 = 'wolf125-paint-v3', V4 = 'wolf125-paint-v4';
 const head = items => `<script>localStorage.clear();${Object.entries(items).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)},${JSON.stringify(JSON.stringify(v))});`).join('')}</script>`;
 const probe = () => ({ paint, status: document.getElementById('status').textContent, v3: localStorage.getItem('wolf125-paint-v3'), v4: localStorage.getItem('wolf125-paint-v4') });
