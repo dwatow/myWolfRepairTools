@@ -8,7 +8,8 @@ function drawBase(ctx, drawing, components, K) {
   ctx.lineCap = 'square'; ctx.lineJoin = 'miter';
   // 座標是像素中心：+0.5 讓奇數線寬對齊像素格
   const path = wire => { ctx.beginPath(); wire.forEach(([x, y], i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, x + 0.5, y + 0.5)); };
-  for (const net of drawing.nets) {
+  const ends = segmentEnds(drawing);
+  drawing.nets.forEach((net, k) => {
     if (net.cable) {
       const half = net.half ?? 7;
       for (const w of net.wires) {
@@ -16,12 +17,18 @@ function drawBase(ctx, drawing, components, K) {
         path(w); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 * half - 3; ctx.stroke();
       }
     } else {
-      ctx.strokeStyle = BASE_INK; ctx.lineWidth = 3;
-      for (const w of net.wires) { path(w); ctx.stroke(); }
+      // 平頭線端：自由端（接到零件）切齊端點；接到同線路其他導線的那端延長半個線寬補滿轉角
+      ctx.strokeStyle = BASE_INK; ctx.lineWidth = 3; ctx.lineCap = 'butt';
+      net.wires.forEach((w, wi) => {
+        const [f0, f1] = ends[k][wi], ext = (p, q, free) => { if (free) return p; const d = Math.hypot(p[0] - q[0], p[1] - q[1]) || 1; return [p[0] + (p[0] - q[0]) / d * 1.5, p[1] + (p[1] - q[1]) / d * 1.5]; };
+        const pts = w.map(p => p.slice()); pts[0] = ext(w[0], w[1], f0); pts[pts.length - 1] = ext(w[w.length - 1], w[w.length - 2], f1);
+        path(pts); ctx.stroke();
+      });
+      ctx.lineCap = 'square';
     }
     ctx.fillStyle = BASE_INK;
     for (const [x, y] of net.dots || []) { ctx.beginPath(); ctx.arc(x + 0.5, y + 0.5, 4.5, 0, 2 * Math.PI); ctx.fill(); }
-  }
+  });
   // 元件方框與名稱
   const font = getComputedStyle(document.body).fontFamily;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -223,7 +230,7 @@ function drawSymbol(ctx, p, font) {
 }
 
 // 照原圖近似的基本圖形（座標為全解析度；w 覆寫線寬，預設 2.5）
-//   line { pts, close?, fill? }：折線；fill: true 實心
+//   line { pts, close?, fill? }：折線；fill: true 實心。rect、circle 加 bg: true 會先填白，蓋住先畫的圖形
 //   rect { box, fill? }、circle { c, r, fill? }、ellipse { c, rx, ry, a0?, a1? }（a0／a1 為角度，畫圓弧；0° 朝右、順時針）
 //   loops { from, to, n, h, side? }：沿 from→to 的線圈環圈（擺線），n 圈、環圈高 h；起點在環圈那一側，side = -1 時整個翻到另一側
 //   hatch { pts, gap? }：多邊形外框＋斜線填充（火星塞箭頭）
@@ -233,8 +240,18 @@ const SHAPES = {
     if (p.close || p.fill) ctx.closePath();
     if (p.fill) ctx.fill(); else ctx.stroke();
   },
-  rect(ctx, p) { const [a, b, c, d] = p.box; if (p.fill) ctx.fillRect(a, b, c - a, d - b); else ctx.strokeRect(a, b, c - a, d - b); },
-  circle(ctx, p) { ctx.beginPath(); ctx.arc(p.c[0], p.c[1], p.r, 0, 2 * Math.PI); if (p.fill) ctx.fill(); else ctx.stroke(); },
+  rect(ctx, p) {
+    const [a, b, c, d] = p.box;
+    if (p.fill) return ctx.fillRect(a, b, c - a, d - b);
+    if (p.bg) { ctx.save(); ctx.fillStyle = '#ffffff'; ctx.fillRect(a, b, c - a, d - b); ctx.restore(); } // bg：先填白蓋住後面的線
+    ctx.strokeRect(a, b, c - a, d - b);
+  },
+  circle(ctx, p) {
+    ctx.beginPath(); ctx.arc(p.c[0], p.c[1], p.r, 0, 2 * Math.PI);
+    if (p.fill) return ctx.fill();
+    if (p.bg) { ctx.save(); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.restore(); }
+    ctx.stroke();
+  },
   ellipse(ctx, p) {
     const rad = d => d * Math.PI / 180;
     ctx.beginPath(); ctx.ellipse(p.c[0], p.c[1], p.rx, p.ry ?? p.rx, 0, rad(p.a0 ?? 0), rad(p.a1 ?? 360)); ctx.stroke();

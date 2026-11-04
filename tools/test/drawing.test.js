@@ -43,3 +43,18 @@ test('斜線報錯', () => {
   const d = D([{ wires: [] }, { wires: [] }, { wires: [[[0, 0], [5, 5]]] }]);
   assert.throws(() => rasterizeDrawing(d), /第 2 條線路網.*水平或垂直/);
 });
+
+test('自由端的線芯縮短、轉角不縮', () => {
+  const r = rasterizeDrawing(D([{ wires: [[[5, 10], [30, 10]], [[30, 10], [30, 30]]] }]));
+  assert.ok(!r.cores[0].includes(at(5, 10)) && !r.cores[0].includes(at(6, 10)), '左端是自由端，縮 2 px');
+  assert.ok(r.cores[0].includes(at(7, 10)));
+  assert.ok(r.cores[0].includes(at(30, 10)) && r.cores[0].includes(at(31, 10)), '轉角照常');
+  assert.ok(!r.cores[0].includes(at(30, 30)) && r.cores[0].includes(at(30, 28)), '下端是自由端');
+  assert.equal(r.label[at(5, 10)], 0, '點擊帶不縮');
+});
+
+test('segmentEnds 判斷自由端', () => {
+  const { segmentEnds } = require('../../js/drawing.js');
+  const ends = segmentEnds({ nets: [{ wires: [[[0, 0], [10, 0]], [[5, 0], [5, 9]]], dots: [] }, { wires: [[[0, 20], [10, 20]]], dots: [[10, 20]] }] });
+  assert.deepEqual(ends, [[[true, true], [false, true]], [[true, false]]]);
+});

@@ -55,6 +55,9 @@ for (const x of m.merges) {
 }
 const partialBy = new Map(); for (const x of m.partial) if (!partialBy.has(x.old)) partialBy.set(x.old, x);
 // 段落中點在標記範圍內的（文字與接頭之間的短線，切缺口時一併切掉，同原圖）不算部分沒畫到
+// 個別段落的例外（exceptions.js 裡有 segment 的項目）：只放過那一段，不放過整條線路
+for (const x of m.partial) { const e = EXC.find(e => e.segment && Math.abs(e.segment[0] - x.at[0]) <= 3 && Math.abs(e.segment[1] - x.at[1]) <= 3); if (e) x.excused = e.reason; }
+for (const [k, x] of [...partialBy]) if (m.partial.filter(p => p.old === k).every(p => p.excused)) { lines1.push({ ok: true, text: `部分線段不畫：舊線路 ${codeOf.get(k) || '未標色'} ${P(x.at)}（已確認例外：${x.excused}）` }); partialBy.delete(k); }
 for (const [k, x] of [...partialBy]) if (mRects.some(([a, b, c, d]) => x.at[0] >= a && x.at[0] <= c && x.at[1] >= b && x.at[1] <= d)) partialBy.delete(k);
 for (const x of partialBy.values()) lines1.push(item(x.old, `部分線段沒畫到：舊線路 ${codeOf.get(x.old) || '未標色'} ${P(x.at)}（共 ${m.partial.filter(p => p.old === x.old).length} 段）`));
 report('接線一致', lines1);
