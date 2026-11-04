@@ -4,6 +4,7 @@
 // 接腳：at 是圓心，x 對齊導線、圓圈邊緣接住導線端點（半徑 11，見 js/basemap.js）
 const pin = (name, at, textAt) => ({ type: 'pin', name, at, vertical: true, textAt });
 const frame = box => ({ type: 'frame', box });
+// 接點圓圈對準導線：button 的 pins 是兩條導線的 x
 const sym = (kind, box, dir) => (dir ? { type: 'symbol', kind, box, dir } : { type: 'symbol', kind, box });
 const conn = (label, box) => ({ type: 'connector', label, box });
 const text = (t, at, size = 18, extra = {}) => ({ type: 'text', text: t, at, size, ...extra });
@@ -45,8 +46,8 @@ const SHARED = {
   // ---- 開關與接頭類 ----
   '燈光/起動開關': [frame([767, 40, 915, 160]), pin('BAT2', [800, 133], [800, 88]), pin('TL', [839, 133], [838, 102]), pin('ST', [884, 133], [884, 102])],
   '離合器開關': [frame([1029, 40, 1141, 160]), pin('B', [1065, 133], [1062, 108]), pin('L', [1109, 133], [1108, 108])],
-  '前剎車燈開關': [frame([1264, 39, 1335, 112]), sym('button', [1278, 52, 1321, 88])],
-  '後剎車燈開關': [frame([1759, 39, 1831, 112]), sym('button', [1774, 53, 1817, 88])],
+  '前剎車燈開關': [frame([1264, 39, 1335, 112]), { ...sym('button', [1278, 52, 1321, 88]), pins: [1287, 1312] }],
+  '後剎車燈開關': [frame([1759, 39, 1831, 112]), { ...sym('button', [1774, 53, 1817, 88]), pins: [1783, 1808] }],
   'CDI 組': [frame([1958, 37, 2181, 290]), L([1958, 238], [2181, 238]),                           // 本體與分隔線
     R([1958, 290, 2089, 325]), R([2004, 290, 2046, 306]), text('4P', [2025, 298], 15, { bold: true }), // 4P 接座（頂端卡榫框寫接腳數）
     R([2108, 290, 2181, 325]), R([2125, 290, 2161, 306]), text('3P', [2143, 298], 15, { bold: true })],

@@ -121,8 +121,8 @@ function drawParts(ctx, parts, font) {
     if (p.type === 'frame') { const [a, b, c, d] = p.box; ctx.save(); ctx.lineWidth = p.w || 2.5; ctx.strokeRect(a, b, c - a, d - b); ctx.restore(); }
     else if (p.type === 'text') text(p.text, p.at[0], p.at[1], p.size || 18, p.vertical, p.bold);
     else if (p.type === 'pin') {
-      const [x, y] = p.at, r = 11; // 同原圖接腳圓圈；+0.5 同導線對齊像素中心，圓心才會對著線中心
-      ctx.beginPath(); ctx.arc(x + 0.5, y + 0.5, r, 0, 2 * Math.PI); ctx.save(); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.restore(); ctx.stroke();
+      const [x, y] = p.at, r = 10; // 同原圖接腳圓圈
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.save(); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.restore(); ctx.stroke();
       // 名稱預設在圓圈上方；textAt 可指定位置
       ctx.font = `bold 20px ${font}`; const len = ctx.measureText(p.name).width;
       const [tx, ty] = p.textAt || (p.vertical ? [x, y - r - 5 - len / 2] : [x, y - r - 14]);
@@ -218,7 +218,9 @@ function drawSymbol(ctx, p, font) {
     }
     case 'button': {
       // 按鈕開關（煞車燈開關）：下方兩個接點圓圈，上方橫桿與按柄
-      const r = Math.min(w * 0.13, h * 0.2); circle(x0 + w * 0.27, y1 - r, r); circle(x0 + w * 0.73, y1 - r, r);
+      // pins：兩個圓心的 x（導線座標，同導線 +0.5 對齊像素中心）；沒給就照方框比例
+      const r = Math.min(w * 0.13, h * 0.2), [pa, pb] = p.pins ? p.pins.map(x => x + 0.5) : [x0 + w * 0.27, x0 + w * 0.73];
+      circle(pa, y1 - r, r); circle(pb, y1 - r, r);
       line([x0, y0 + h * 0.45], [x1, y0 + h * 0.45]); line([cx, y0], [cx, y0 + h * 0.45]);
       break;
     }
