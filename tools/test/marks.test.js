@@ -76,3 +76,37 @@ test('寬度不符列入待判讀', () => {
   assert.equal(r.labels.length, 0);
   assert.match(r.review[0].reason, /寬度/);
 });
+
+test('已手改拒絕覆寫', () => {
+  const { assertDraft } = require('../redraw/marks.js');
+  assert.throws(() => assertDraft('// 已手改（2026-11-04）\nwindow.WOLF_DRAWING = {};', false), /已手改.*--force/);
+  assert.doesNotThrow(() => assertDraft('// 已手改\n', true));
+  assert.doesNotThrow(() => assertDraft('// 線路圖資料\n', false));
+});
+
+test('三角形接母端拆成 plug 與 socket', () => {
+  const c = canvas(); c.tri(40, 40, 30, 10); c.frame(71, 30, 115, 50); c.frame(82, 38, 104, 42, 1);
+  const r = attach(one(c), { size: [W, H], nets: [] }, c.image, c.label);
+  assert.deepEqual(r.inline.map(x => [x.kind, x.dir, !!x.flip]), [['plug', 'h', false], ['socket', 'h', false]]);
+  assert.ok(Math.abs(r.inline[0].at[0] - 55) <= 2 && Math.abs(r.inline[1].at[0] - 93) <= 2, JSON.stringify(r.inline));
+});
+
+test('母端在左、三角形朝左', () => {
+  const c = canvas(); c.frame(40, 30, 84, 50); c.frame(51, 38, 73, 42, 1);
+  // 朝左的三角形：右邊直邊、尖端在左（接到母端右框）
+  c.rect(114, 30, 115, 50); for (let i = 0; i <= 30; i++) { const d = Math.round(10 * (1 - i / 30)); c.ink(115 - i, 40 - d); c.ink(115 - i, 40 + d); c.ink(115 - i, 41 - d); c.ink(115 - i, 39 + d); }
+  const r = attach(one(c), { size: [W, H], nets: [] }, c.image, c.label);
+  assert.deepEqual(r.inline.map(x => [x.kind, !!x.flip]), [['socket', false], ['plug', true]]);
+});
+
+test('細線碎片（底線、接頭外框殘段）忽略', () => {
+  const c = canvas(); c.rect(20, 20, 180, 22); c.rect(100, 50, 101, 74);
+  const r = attach(one(c), { size: [W, H], nets: [] }, c.image, c.label);
+  assert.equal(r.review.length + r.labels.length + r.inline.length + r.connectors.length, 0);
+});
+
+test('單字母離導線端點 20 px 仍對得上', () => {
+  const c = canvas(); c.rect(70, 43, 80, 57);
+  const r = attach(one(c), { size: [W, H], nets: [{ code: 'B', wires: [[[0, 50], [50, 50]], [[100, 50], [199, 50]]] }] }, c.image, c.label);
+  assert.deepEqual(r.labels.map(l => l.text), ['B']);
+});

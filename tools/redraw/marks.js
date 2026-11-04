@@ -2,7 +2,7 @@
 // 純函式，Node 用。image = { data: RGBA, width, height }；label = 新圖點陣化的 label（導線範圍 >= 0）
 const MIN_AREA = 6;               // 小於這個面積的墨水塊忽略（雜點）
 const JOIN_X = 8, JOIN_Y = 6;     // 相距在此以內的塊併成一個標記（字母之間）
-const NEAR = 12;                  // 文字外框外擴多少 px 內找導線
+const NEAR = 24;                  // 文字外框外擴多少 px 內找導線（單字母離導線端點約 20 px）
 const ALIGN = 8;                  // 文字中心和導線中心線的最大偏移
 const CHAR_MIN = 9, CHAR_MAX = 17; // 每個字元沿書寫方向的寬度範圍（px）
 
@@ -39,7 +39,8 @@ function findMarks({ image, label, skip = [] }) {
   return [...out.values()].sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0);
 }
 
-// 分類：{ kind: 'plug' | 'socket' | 'text' | 'connector' | 'other', dir?, flip? }
+// 分類：{ kind: 'plug' | 'socket' | 'pair' | 'line' | 'text' | 'connector' | 'other', dir?, flip?, socketFirst? }
+//   pair：三角形公端接母端併成一塊；line：細線碎片（元件名稱底線、被導線切斷的接頭外框），不畫
 function classify(m, image, label) {
   const { width: W, data } = image, w = m.x1 - m.x0 + 1, h = m.y1 - m.y0 + 1;
   const long = Math.max(w, h), short = Math.min(w, h), dir = w >= h ? 'h' : 'v';
@@ -56,6 +57,7 @@ function classify(m, image, label) {
     }
     spans.push(lo < 0 ? 0 : hi - lo + 1);
   }
+  if (short <= 3) return { kind: 'line' };
   if (m.parts === 1 && long >= 24 && long <= 40 && short >= 16 && short <= 36 && ratio < 0.35) {
     let dec = 0, inc = 0;
     for (let t = 1; t < spans.length; t++) { if (spans[t] < spans[t - 1]) dec++; else if (spans[t] > spans[t - 1]) inc++; }
@@ -68,6 +70,12 @@ function classify(m, image, label) {
     const colFill = x => { let n = 0; for (let y = m.y0; y <= m.y1; y++) n += at(x, y); return n / h; };
     const edges = dir === 'h' ? [rowFill(m.y0), rowFill(m.y1), colFill(m.x0), colFill(m.x1)] : [colFill(m.x0), colFill(m.x1), rowFill(m.y0), rowFill(m.y1)];
     if (edges.every(v => v > 0.6) && ratio < 0.6) return { kind: 'socket', dir };
+  }
+  if (long >= 66 && long <= 100 && short >= 16 && short <= 26) {
+    // 母端的外框邊緣（第一列）整段都是墨水，三角形只有底邊一點：比較兩端 20 欄的邊緣墨水量
+    const edge = t => dir === 'h' ? at(m.x0 + t, m.y0) + at(m.x0 + t, m.y1) : at(m.x0, m.y0 + t) + at(m.x1, m.y0 + t);
+    let a = 0, b = 0; for (let t = 0; t < 20; t++) { a += edge(t); b += edge(long - 1 - t); }
+    return { kind: 'pair', dir, socketFirst: a > b };
   }
   if (long >= 60) return { kind: 'connector', dir };
   if (short <= 34) return { kind: 'text' };
@@ -93,6 +101,14 @@ function attach(marks, drawing, image, label) {
   };
   for (const m of marks) {
     const c = classify(m, image, label), at = center(m), box = [m.x0, m.y0, m.x1, m.y1];
+    if (c.kind === 'line') continue;
+    if (c.kind === 'pair') {
+      const h = c.dir === 'h', a0 = h ? m.x0 : m.y0, a1 = h ? m.x1 : m.y1, cross = h ? at[1] : at[0];
+      const pt = v => h ? [v, cross] : [cross, v], P = 15, S = 22; // 三角形、母端沿線方向的半長
+      if (c.socketFirst) inline.push({ kind: 'socket', at: pt(a0 + S), dir: c.dir }, { kind: 'plug', at: pt(a1 - P), dir: c.dir, flip: true });
+      else inline.push({ kind: 'plug', at: pt(a0 + P), dir: c.dir }, { kind: 'socket', at: pt(a1 - S), dir: c.dir });
+      continue;
+    }
     if (c.kind === 'plug') inline.push(c.flip ? { kind: 'plug', at, dir: c.dir, flip: true } : { kind: 'plug', at, dir: c.dir });
     else if (c.kind === 'socket') inline.push({ kind: 'socket', at, dir: c.dir });
     else if (c.kind === 'connector') { connectors.push({ label: null, box }); review.push({ box, kind: 'connector', reason: '多腳接頭：接腳數字要看原圖' }); }
@@ -110,4 +126,9 @@ function attach(marks, drawing, image, label) {
   return { labels, inline, connectors, review };
 }
 
-module.exports = { findMarks, classify, attach };
+// drawing.js 第一行含「// 已手改」時，產生工具（bootstrap.js、add-marks.js）不覆寫，除非加 --force
+function assertDraft(text, force) {
+  if (!force && /^\/\/ 已手改/.test(text)) throw new Error('drawing.js 已手改，產生工具不會覆寫；確定要重產請加 --force');
+}
+
+module.exports = { findMarks, classify, attach, assertDraft };
