@@ -104,7 +104,8 @@ function drawMarks(ctx, drawing, font) {
   for (const c of drawing.connectors || []) {
     const [x0, y0, x1, y1] = c.box;
     ctx.fillStyle = '#ffffff'; ctx.lineWidth = 2.5;
-    ctx.fillRect(x0, y0, x1 - x0, y1 - y0); ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    if (!c.through) ctx.fillRect(x0, y0, x1 - x0, y1 - y0); // through：框內有導線穿過，不填白
+    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
     if (c.label) {
       ctx.fillStyle = BASE_INK; ctx.font = `${MARK.connText}px ${font}`;
       const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
