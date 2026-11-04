@@ -153,3 +153,13 @@ test('兩端各在不同框內、中段在框外的未標色導線不移除', ()
     connectors: [{ label: '', box: [10, 40, 30, 60] }, { label: '', box: [170, 40, 190, 60] }], labels: [], inline: [] };
   assert.equal(dropMarkStrokes(d), 0);
 });
+
+test('只改寫 parts', () => {
+  const { applyParts, formatDrawing } = require('../redraw/write-drawing.js');
+  const d = applyParts({ size: [1, 1], nets: [{ code: 'B', wires: [] }], labels: [{ text: 'B', at: [0, 0] }], parts: [] }, [{ type: 'text', text: 'a', at: [1, 2] }, { type: 'frame', box: [0, 0, 1, 1] }]);
+  assert.deepEqual(d.nets, [{ code: 'B', wires: [] }]);
+  assert.deepEqual(d.labels, [{ text: 'B', at: [0, 0] }]);
+  assert.equal(d.parts.length, 2);
+  const out = formatDrawing(d);
+  assert.match(out, /\n  parts: \[\n    \{"type":"text","text":"a","at":\[1,2\]\},\n    \{"type":"frame"/);
+});

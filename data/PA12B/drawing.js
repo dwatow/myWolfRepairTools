@@ -254,4 +254,6 @@ window.WOLF_DRAWING = {
   texts: [
     {"text":"PA12B SERIES","at":[323,78],"size":52},
   ],
+  parts: [
+  ],
 };
