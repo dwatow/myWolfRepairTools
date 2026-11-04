@@ -64,7 +64,7 @@
 
 ## 三、已知的小問題
 
-2026-11-05 已修正原表 9 項中的 8 項：
+2026-11-05 已修正原表 9 項中的 8 項，以及第 5 階段暫緩的 3 項（`adding-switch-tables` 改用重繪資料與新工具 `pin-nets.js` 確認接腳、`comp-highlight.js` 檢查元件名稱）：
 - 元件圖元缺座標時，頁面會指出是哪一筆、缺什麼。
 - 載入錯誤改顯示「線路圖載入失敗」。
 - `compare.js` 加上比對接地欄位。
@@ -77,9 +77,6 @@
 | 問題 | 影響 | 位置 |
 | --- | --- | --- |
 | `add-marks.js --force` 重跑時，164 個線色文字中有 18 個沿文字方向偏移 1～4 px。原因是萃取時會扣掉已畫的導線，導線切缺口後，文字旁的原圖導線墨水被算進文字範圍 | 不再重跑這支工具（skill 已寫明）；要根治得重寫萃取時文字範圍的判斷 | `tools/redraw/add-marks.js`、`marks.js` 的 `findMarks` |
-| `adding-switch-tables` 的說明寫「PA12C 還沒有開關表」，實際上已經有 | skill 觸發條件不準 | `.claude/skills/adding-switch-tables/SKILL.md` |
-| `adding-switch-tables` 找接腳座標還在用舊辨識（`analyze`） | 接腳可能落在重繪後導線的缺口裡，點了不亮 | 同上 |
-| `comp-highlight.js` 的元件名稱打錯時，只顯示「沒有結果」 | 看不出是名稱錯了 | `tools/redraw/comp-highlight.js` |
 
 ## 四、待使用者決定
 
