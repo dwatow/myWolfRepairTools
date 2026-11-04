@@ -71,7 +71,7 @@ async function init() {
 function buildNets(drawing, r) {
   label = r.label;
   nets = drawing.nets.map((d, k) => {
-    const pixels = r.cores[k], net = { pixels, n: pixels.length, x0: IW, y0: IH, x1: 0, y1: 0, segs: [], code: d.code ?? null, ground: !!d.ground };
+    const pixels = r.cores[k], net = { pixels, n: pixels.length, x0: IW, y0: IH, x1: 0, y1: 0, segs: [], code: d.code ?? null, ground: !!d.ground, dots: d.dots || [] };
     for (const p of pixels) { const x = p % IW, y = (p / IW) | 0; if (x < net.x0) net.x0 = x; if (x > net.x1) net.x1 = x; if (y < net.y0) net.y0 = y; if (y > net.y1) net.y1 = y; }
     return net;
   });
@@ -139,6 +139,18 @@ function drawNets(img, ox, oy, w, ks, r) {
   for (const k of ks) { const f = netFill(k); stamp(img, ox, oy, w, nets[k], f, 255, f ? r : 0); }
 }
 const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+// 接點畫成真的圓形（像素式的上色會有鋸齒）：先畫深色外框圈，再畫線色實心圓；雙色線用主色。沒有顏色（未標線色且未塗色）時用 fallback，沒有 fallback 就不畫（底圖已有圓點）
+const DOT = 4; // 同 js/drawing.js 的接點半徑
+const dotColor = k => paint[k] || (showCodes() && nets[k].code && WIRE[nets[k].code.split('/')[0]] ? WIRE[nets[k].code.split('/')[0]][0] : null);
+function drawDots(g, ks, ox, oy, r, fallback) {
+  for (const k of ks) {
+    const col = dotColor(k) || fallback; if (!col) continue;
+    for (const [x, y] of nets[k].dots) {
+      g.beginPath(); g.arc(x - ox + 0.5, y - oy + 0.5, DOT + r + 1, 0, 2 * Math.PI); g.fillStyle = `rgb(${OUTLINE.join(',')})`; g.fill();
+      g.beginPath(); g.arc(x - ox + 0.5, y - oy + 0.5, DOT + r, 0, 2 * Math.PI); g.fillStyle = col; g.fill();
+    }
+  }
+}
 const visibleNets = ks => ks.filter(k => !(hideGround() && nets[k].ground));
 const selectedNets = sel => !sel ? [] : sel.kind === 'net' ? [sel.k] : visibleNets(sel.kind === 'multi' ? sel.ks : COMPONENTS[sel.i].nets);
 
@@ -153,13 +165,16 @@ function thickLayer(ks, r) {
   for (const k of ks) stamp(img, x0, y0, w, nets[k], OUTLINE, 255, r + 1);
   for (const k of ks) { const f = netFill(k); stamp(img, x0, y0, w, nets[k], f || [70, 76, 82], 255, r); }
   cx.putImageData(img, 0, 0);
+  drawDots(cx, ks, x0, y0, r, '#464c52');
   return { c, x: x0, y: y0 };
 }
 
 function rebuildOverlay() {
   const img = overlayCtx.createImageData(IW, IH);
-  drawNets(img, 0, 0, IW, visibleNets(nets.map((_, k) => k)), THIN);
+  const ks = visibleNets(nets.map((_, k) => k));
+  drawNets(img, 0, 0, IW, ks, THIN);
   overlayCtx.putImageData(img, 0, 0);
+  drawDots(overlayCtx, ks, 0, 0, THIN);
   draw();
 }
 

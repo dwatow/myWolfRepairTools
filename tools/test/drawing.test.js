@@ -44,11 +44,11 @@ test('斜線報錯', () => {
   assert.throws(() => rasterizeDrawing(d), /第 2 條線路網.*水平或垂直/);
 });
 
-test('自由端的線芯縮短、轉角不縮', () => {
+test('自由端的線芯縮短、轉角圓角', () => {
   const r = rasterizeDrawing(D([{ wires: [[[5, 10], [30, 10]], [[30, 10], [30, 30]]] }]));
   assert.ok(!r.cores[0].includes(at(5, 10)) && !r.cores[0].includes(at(6, 10)), '左端是自由端，縮 2 px');
   assert.ok(r.cores[0].includes(at(7, 10)));
-  assert.ok(r.cores[0].includes(at(30, 10)) && r.cores[0].includes(at(31, 10)), '轉角照常');
+  assert.ok(!r.cores[0].includes(at(30, 10)) && r.cores[0].includes(at(28, 12)), '轉角畫成半徑 6 的圓弧（直角那一點不畫、弧上的點有畫）');
   assert.ok(!r.cores[0].includes(at(30, 30)) && r.cores[0].includes(at(30, 28)), '下端是自由端');
   assert.equal(r.label[at(5, 10)], 0, '點擊帶不縮');
 });
@@ -64,4 +64,18 @@ test('一般線路網可另帶粗電纜 cables', () => {
   assert.equal(r.label[at(34, 25)], 0, '電纜半寬 4');
   assert.equal(r.label[at(35, 25)], -1);
   assert.ok(r.cores[0].includes(at(33, 25)), '電纜整寬都是線芯');
+});
+
+test('T 字分叉不畫圓角', () => {
+  const r = rasterizeDrawing(D([{ wires: [[[5, 10], [35, 10]], [[20, 10], [20, 30]]], dots: [[20, 10]] }]));
+  assert.ok(r.cores[0].includes(at(20, 10)) && r.cores[0].includes(at(21, 11)));
+});
+
+test('wireGeometry：轉角拆成兩段直線＋圓弧', () => {
+  const { wireGeometry } = require('../../js/drawing.js');
+  const g = wireGeometry(D([{ wires: [[[5, 10], [30, 10]], [[30, 10], [30, 30]]] }]), 6);
+  assert.deepEqual(g.lines.map(l => [l.a, l.b]), [[[5, 10], [24, 10]], [[30, 16], [30, 30]]]);
+  assert.equal(g.arcs.length, 1);
+  assert.deepEqual(g.arcs[0].c, [24, 16]);
+  assert.equal(g.arcs[0].r, 6);
 });
