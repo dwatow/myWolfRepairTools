@@ -14,7 +14,7 @@ const SHARED = {
     { label: '6P', box: [2062, 1351, 2241, 1392] },
     { label: '2P', box: [2467, 1285, 2516, 1327] },
     { label: '2P', box: [2533, 256, 2584, 298] },
-    { label: '2P', box: [2694, 145, 2743, 186] },
+    { label: '2P', box: [2688, 146, 2747, 186] }, // 油量計下方：和油量計外框同寬、上緣切齊外框底邊
     { label: '2P', box: [2695, 256, 2746, 298] },
     { label: '', box: [457, 352, 503, 392] },     // 前接頭：兩支 G 腳在框內以圓點跨接
     { label: '', box: [458, 1351, 504, 1391] },   // 喇叭旁併接接頭：兩支 B 腳併成一條
@@ -33,9 +33,9 @@ const SHARED = {
   labels: [
     { text: 'B', at: [379, 1361], vertical: false }, { text: 'B', at: [379, 1380], vertical: false },
     { text: 'GR', at: [1432, 627], vertical: false },
-    // 原圖寫「G1」，導線線色是 G（已回報使用者）
-    { text: 'G1', at: [3064, 731], vertical: false },
-    { text: 'G1', at: [314, 874], vertical: false },
+    // 原圖寫「G1」，導線線色是 G：使用者決定改寫成 G
+    { text: 'G', at: [3064, 731], vertical: false },
+    { text: 'G', at: [314, 874], vertical: false },
   ],
 };
 module.exports = { PA12B: SHARED, PA12C: SHARED };

@@ -11,7 +11,12 @@ function drawBase(ctx, drawing, components, K) {
   const geo = wireGeometry(drawing); // 導線的直線段與轉角圓弧（同 js/drawing.js 點陣化）
   drawing.nets.forEach((net, k) => {
     // 粗電纜：雙線外框（外圈深色、內圈白）。cable 線路網的 wires，以及一般線路網另帶的 cables
-    const tube = (w, half) => { path(w); ctx.strokeStyle = BASE_INK; ctx.lineWidth = 2 * half + 1; ctx.stroke(); path(w); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 * half - 3; ctx.stroke(); };
+    // 轉彎照 cableGeometry 畫成圓弧（同 js/drawing.js 點陣化）；頭尾 square 線端
+    const tubePath = (w, half) => {
+      const g = cableGeometry(w, half); ctx.beginPath(); ctx.moveTo(g.lines[0][0][0] + 0.5, g.lines[0][0][1] + 0.5);
+      g.lines.forEach(([, b], j) => { ctx.lineTo(b[0] + 0.5, b[1] + 0.5); const a = g.arcs[j]; if (a) ctx.arc(a.c[0] + 0.5, a.c[1] + 0.5, a.r, a.a0, a.a0 + a.sweep, a.sweep < 0); });
+    };
+    const tube = (w, half) => { tubePath(w, half); ctx.strokeStyle = BASE_INK; ctx.lineWidth = 2 * half + 1; ctx.stroke(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 * half - 3; ctx.stroke(); };
     for (const c of net.cables || []) tube(c.path, c.half ?? 7);
     if (net.cable) {
       for (const w of net.wires) tube(w, net.half ?? 7);
