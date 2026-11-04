@@ -30,11 +30,22 @@ function drawBase(ctx, drawing, components, K) {
     // 有 parts 時外框由 parts 的 frame 決定（原圖有外框才畫）；舊資料沒有 parts 就照舊畫元件方框
     if (!drawing.parts) { ctx.strokeStyle = BASE_BOX; ctx.lineWidth = 1.5; ctx.strokeRect(a, b, cc - a, d - b); }
     const [x0, y0, x1, y1] = c.label ? c.label.map(v => v * K) : [a + 4, b + 4, cc - 4, b + 26];
-    let size = Math.min(28, (y1 - y0) * 0.9);
+    // 名稱範圍可能含規格那一行（原圖名稱下方的「(12V 10W)」），名稱字級上限 24、靠範圍上緣
+    // 名稱結尾的全形括號是 components.js 用來區分同名元件的（例：接地（引擎）），原圖沒有，不畫
+    const name = c.name.replace(/（[^）]*）$/, '');
+    ctx.fillStyle = BASE_INK;
+    if (y1 - y0 > 1.5 * (x1 - x0)) {
+      // 直的名稱範圍（例：脈波線圈）：同原圖逆時針轉 90°
+      let size = Math.min(24, (x1 - x0) * 0.9); ctx.font = `${size}px ${font}`;
+      const w = ctx.measureText(name).width; if (w > y1 - y0) { size *= (y1 - y0) / w; ctx.font = `${size}px ${font}`; }
+      ctx.save(); ctx.translate((x0 + x1) / 2, (y0 + y1) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(name, 0, 0); ctx.restore();
+      continue;
+    }
+    let size = Math.min(24, (y1 - y0) * 0.9);
     ctx.font = `${size}px ${font}`;
-    const w = ctx.measureText(c.name).width;
+    const w = ctx.measureText(name).width;
     if (w > x1 - x0) { size *= (x1 - x0) / w; ctx.font = `${size}px ${font}`; }
-    ctx.fillStyle = BASE_INK; ctx.fillText(c.name, (x0 + x1) / 2, (y0 + y1) / 2);
+    ctx.fillText(name, (x0 + x1) / 2, y0 + size / 2 + 1);
   }
   drawParts(ctx, drawing.parts || [], font);
   drawMarks(ctx, drawing, font);
@@ -189,6 +200,12 @@ function drawSymbol(ctx, p, font) {
     }
     case 'ground': { for (let i = 0; i < 3; i++) { const half = w / 2 * (1 - i * 0.33), y = y0 + h * i / 2.5; line([cx - half, y], [cx + half, y]); } break; }
     case 'lug': { const r = Math.min(w / 2, h * 0.3); circle(cx, y0 + r, r); circle(cx, y0 + r, r * 0.4); line([cx - r * 0.4, y0 + 2 * r], [cx - r * 0.4, y1]); line([cx + r * 0.4, y0 + 2 * r], [cx + r * 0.4, y1]); break; }
+    case 'term': {
+      // 電瓶端子：圓圈內畫 −（sign: '-'）或 ＋（sign: '+'）
+      const r = Math.min(w, h) / 2; circle(cx, cy, r); line([cx - r * 0.6, cy], [cx + r * 0.6, cy]);
+      if (p.sign === '+') line([cx, cy - r * 0.6], [cx, cy + r * 0.6]);
+      break;
+    }
     case 'button': {
       // 按鈕開關（煞車燈開關）：下方兩個接點圓圈，上方橫桿與按柄
       const r = Math.min(w * 0.13, h * 0.2); circle(x0 + w * 0.27, y1 - r, r); circle(x0 + w * 0.73, y1 - r, r);
