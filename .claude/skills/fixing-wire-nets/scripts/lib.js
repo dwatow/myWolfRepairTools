@@ -19,8 +19,14 @@ function loadWindow(files, dir = PROJECT) {
 // 7 條橫條上下拼接後逆時針轉 90°（與 app.js init 相同），結果依圖快取在 WORK/<圖>[-<雜湊>].raw
 // 快取以 strips.js 的路徑、修改時間與大小為準：底圖改過就重新解碼
 // dir：讀哪個資料夾的 data/<圖>/strips.js（預設專案；比對改底圖前後時傳備份）
+// 原廠掃描圖不在 git 內（.gitignore），只有本機有原圖檔的人能跑比對原圖的工具；沒有時丟出說明
+function originalFile(dir = PROJECT, diagram = DIAGRAM) {
+  const file = path.join(dir, 'data', diagram, 'strips.js');
+  if (!fs.existsSync(file)) throw new Error(`找不到 data/${diagram}/strips.js（原廠掃描圖不在 git 內，比對原圖的工具需要本機的原圖檔）`);
+  return file;
+}
 function loadImage(dir = PROJECT) {
-  const file = path.join(dir, DATA, 'strips.js'), st = fs.statSync(file), stamp = `${file}:${st.mtimeMs}:${st.size}`;
+  const file = originalFile(dir), st = fs.statSync(file), stamp = `${file}:${st.mtimeMs}:${st.size}`;
   const tag = dir === PROJECT ? DIAGRAM : `${DIAGRAM}-${require('crypto').createHash('md5').update(file).digest('hex').slice(0, 8)}`;
   const raw = path.join(WORK, `${tag}.raw`), meta = path.join(WORK, `${tag}.json`);
   if (fs.existsSync(raw) && fs.existsSync(meta)) {
@@ -103,4 +109,4 @@ function resolveBase(arg) {
   return dir;
 }
 
-module.exports = { PROJECT, WORK, DIAGRAM, SELECTIONS, loadImage, analyze, countNets, resolveBase };
+module.exports = { PROJECT, WORK, DIAGRAM, SELECTIONS, loadImage, analyze, countNets, resolveBase, originalFile };
