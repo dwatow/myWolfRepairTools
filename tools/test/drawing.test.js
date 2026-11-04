@@ -79,3 +79,19 @@ test('wireGeometry：轉角拆成兩段直線＋圓弧', () => {
   assert.deepEqual(g.arcs[0].c, [24, 16]);
   assert.equal(g.arcs[0].r, 6);
 });
+
+test('粗電纜轉彎畫成圓角：外角不是線芯，圓弧上是線芯', () => {
+  const r = rasterizeDrawing(D([{ code: 'B', cable: true, half: 3, wires: [[[5, 5], [30, 5], [30, 35]]] }]));
+  assert.ok(!r.cores[0].includes(at(33, 2)), '外角（原本的直角）不畫');
+  assert.ok(r.cores[0].includes(at(27, 8)), '圓弧中點（圓心 21,14、半徑 9）是線芯');
+  assert.ok(r.cores[0].includes(at(10, 7)) && r.cores[0].includes(at(32, 30)), '直線段整寬仍是線芯');
+});
+
+test('cableGeometry：轉角半徑 3 倍半寬，受相鄰段長限制', () => {
+  const { cableGeometry } = require('../../js/drawing.js');
+  const g = cableGeometry([[5, 5], [30, 5], [30, 35]], 3);
+  assert.deepEqual(g.lines, [[[5, 5], [21, 5]], [[30, 14], [30, 35]]]);
+  assert.deepEqual(g.arcs.map(a => [a.c, a.r]), [[[21, 14], 9]]);
+  const s = cableGeometry([[5, 5], [30, 5], [30, 12]], 7); // 末段只有 7 px：半徑 7
+  assert.equal(s.arcs[0].r, 7);
+});

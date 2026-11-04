@@ -77,13 +77,15 @@ for (const s of win.WOLF_SWITCHES || []) for (const [pin, p] of Object.entries(s
   if (near4(neu.label, p) < 0) lines2.push({ ok: false, text: `開關 ${s.name} 接腳 ${pin} ${P(p)} 4 px 內沒有線` });
 const L = win.WOLF_LEGACY;
 if (L) {
+  // exceptions.js 標了 drop 的舊線路：新圖不畫，比照整批例外
+  const exDrop = new Set(EXC.filter(e => e.drop).map(e => near(old.label, e.pick)));
   let okN = 0, onDropped = 0;
   let leak = 0;
   L.picks.forEach((p, k) => {
     if (p === null) { onDropped++; return; } // 已標成不轉移（線在新圖不存在）
     const root = near(old.label, p);
     // 新圖不畫的舊線路，座標必須是 null，否則轉移時可能塗到剛好經過該點的別條線
-    if (drop.has(root) || outSet.has(root) || markStrokes.includes(root)) { if (near(neu.label, p) >= 0) { leak++; lines2.push({ ok: false, text: `舊線路 ${k} 是不畫的筆畫，但座標 ${P(p)} 落在新線路 ${near(neu.label, p)} 上（legacy.js 應為 null）` }); } else onDropped++; return; }
+    if (drop.has(root) || outSet.has(root) || markStrokes.includes(root) || exDrop.has(root)) { if (near(neu.label, p) >= 0) { leak++; lines2.push({ ok: false, text: `舊線路 ${k} 是不畫的筆畫，但座標 ${P(p)} 落在新線路 ${near(neu.label, p)} 上（legacy.js 應為 null）` }); } else onDropped++; return; }
     const want = m.map.get(root), got = near(neu.label, p);
     if (want !== undefined && want === got) okN++;
     else lines2.push({ ok: false, text: `舊線路 ${k} 的塗色座標 ${P(p)}：應落在新 ${want ?? '（無對應）'}，實際 ${got}` });

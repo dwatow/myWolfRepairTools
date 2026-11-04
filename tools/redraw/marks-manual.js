@@ -14,10 +14,10 @@ const SHARED = {
     { label: '6P', box: [2062, 1351, 2241, 1392] },
     { label: '2P', box: [2467, 1285, 2516, 1327] },
     { label: '2P', box: [2533, 256, 2584, 298] },
-    { label: '2P', box: [2694, 145, 2743, 186] },
+    { label: '2P', box: [2688, 146, 2747, 186] }, // 油量計下方：和油量計外框同寬、上緣切齊外框底邊
     { label: '2P', box: [2695, 256, 2746, 298] },
     { label: '', box: [457, 352, 503, 392] },     // 前接頭：兩支 G 腳在框內以圓點跨接
-    { label: '', box: [458, 1351, 504, 1391] },   // 喇叭旁併接接頭：兩支 B 腳併成一條
+    { label: '', box: [458, 1351, 504, 1391], through: true }, // 喇叭旁併接接頭：兩支 B 腳在框內併成一條（框內導線見 nets-manual.js）
     { label: '', box: [2936, 1130, 2982, 1169] }, // 左後方向燈：L 形雙母端
   ],
   inline: [
@@ -25,6 +25,8 @@ const SHARED = {
     { kind: 'plug', at: [443, 1361], dir: 'h' }, { kind: 'plug', at: [443, 1380], dir: 'h' },
     { kind: 'plug', at: [2921, 1140], dir: 'h' }, { kind: 'plug', at: [2997, 1160], dir: 'h', flip: true },
     { kind: 'plug', at: [1472, 627], dir: 'h' }, { kind: 'socket', at: [1510, 627], dir: 'h' }, // GR 線：文字與接頭併成一塊
+    // G/R、G/Y：三角形左側的短導線被併進接頭，三角形被推到左邊 11 px；照原圖改到 1458～1488（尖端貼著母端）
+    { kind: 'plug', at: [1473, 403], dir: 'h' }, { kind: 'plug', at: [1473, 444], dir: 'h' },
   ],
   // 自動結果中要移除的線色文字（at 相距 ≤ 3 px 視為同一筆）
   removeLabels: [
@@ -33,9 +35,9 @@ const SHARED = {
   labels: [
     { text: 'B', at: [379, 1361], vertical: false }, { text: 'B', at: [379, 1380], vertical: false },
     { text: 'GR', at: [1432, 627], vertical: false },
-    // 原圖寫「G1」，導線線色是 G（已回報使用者）
-    { text: 'G1', at: [3064, 731], vertical: false },
-    { text: 'G1', at: [314, 874], vertical: false },
+    // 原圖寫「G1」，導線線色是 G：使用者決定改寫成 G
+    { text: 'G', at: [3064, 731], vertical: false },
+    { text: 'G', at: [314, 874], vertical: false },
   ],
 };
 module.exports = { PA12B: SHARED, PA12C: SHARED };

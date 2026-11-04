@@ -11,7 +11,12 @@ function drawBase(ctx, drawing, components, K) {
   const geo = wireGeometry(drawing); // 導線的直線段與轉角圓弧（同 js/drawing.js 點陣化）
   drawing.nets.forEach((net, k) => {
     // 粗電纜：雙線外框（外圈深色、內圈白）。cable 線路網的 wires，以及一般線路網另帶的 cables
-    const tube = (w, half) => { path(w); ctx.strokeStyle = BASE_INK; ctx.lineWidth = 2 * half + 1; ctx.stroke(); path(w); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 * half - 3; ctx.stroke(); };
+    // 轉彎照 cableGeometry 畫成圓弧（同 js/drawing.js 點陣化）；頭尾 square 線端
+    const tubePath = (w, half) => {
+      const g = cableGeometry(w, half); ctx.beginPath(); ctx.moveTo(g.lines[0][0][0] + 0.5, g.lines[0][0][1] + 0.5);
+      g.lines.forEach(([, b], j) => { ctx.lineTo(b[0] + 0.5, b[1] + 0.5); const a = g.arcs[j]; if (a) ctx.arc(a.c[0] + 0.5, a.c[1] + 0.5, a.r, a.a0, a.a0 + a.sweep, a.sweep < 0); });
+    };
+    const tube = (w, half) => { tubePath(w, half); ctx.strokeStyle = BASE_INK; ctx.lineWidth = 2 * half + 1; ctx.stroke(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 * half - 3; ctx.stroke(); };
     for (const c of net.cables || []) tube(c.path, c.half ?? 7);
     if (net.cable) {
       for (const w of net.wires) tube(w, net.half ?? 7);
@@ -69,14 +74,25 @@ function drawMarks(ctx, drawing, font) {
     ctx.font = `bold ${MARK.text}px ${font}`;
     if (l.vertical) vText(l.text, l.at[0], l.at[1]); else ctx.fillText(l.text, l.at[0], l.at[1]);
   }
+  // 三角形公端緊接著母端（同一條線、尖端朝向母端、空隙 ≤ 6 px）時，尖端拉到母端外框上，兩者貼齊（同原圖）
+  const tipReach = m => {
+    const ax = m.dir === 'v' ? 1 : 0, sgn = m.flip ? -1 : 1;
+    let best = MARK.plugLen / 2;
+    for (const s of drawing.inline || []) {
+      if (s.kind !== 'socket' || s.dir !== m.dir || Math.abs(s.at[1 - ax] - m.at[1 - ax]) > 3) continue;
+      const reach = (s.at[ax] - m.at[ax]) * sgn - MARK.sockW / 2, gap = reach - MARK.plugLen / 2;
+      if (gap > 0 && gap <= 6) best = reach;
+    }
+    return best;
+  };
   for (const m of drawing.inline || []) {
     ctx.save(); ctx.translate(m.at[0] + 0.5, m.at[1] + 0.5);
     if (m.dir === 'v') ctx.rotate(Math.PI / 2);
     if (m.flip) ctx.scale(-1, 1);
     if (m.kind === 'plug') {
-      const L = MARK.plugLen / 2, B = MARK.plugBase / 2;
+      const L = MARK.plugLen / 2, B = MARK.plugBase / 2, T = tipReach(m); // T：尖端位置（底邊固定在 −L）
       ctx.fillStyle = '#ffffff'; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.moveTo(-L, -B); ctx.lineTo(L, 0); ctx.lineTo(-L, B); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-L, -B); ctx.lineTo(T, 0); ctx.lineTo(-L, B); ctx.closePath(); ctx.fill(); ctx.stroke();
     } else {
       const w = MARK.sockW / 2, h = MARK.sockH / 2;
       ctx.fillStyle = '#ffffff'; ctx.lineWidth = 2;
@@ -88,7 +104,8 @@ function drawMarks(ctx, drawing, font) {
   for (const c of drawing.connectors || []) {
     const [x0, y0, x1, y1] = c.box;
     ctx.fillStyle = '#ffffff'; ctx.lineWidth = 2.5;
-    ctx.fillRect(x0, y0, x1 - x0, y1 - y0); ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    if (!c.through) ctx.fillRect(x0, y0, x1 - x0, y1 - y0); // through：框內有導線穿過，不填白
+    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
     if (c.label) {
       ctx.fillStyle = BASE_INK; ctx.font = `${MARK.connText}px ${font}`;
       const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
@@ -213,7 +230,9 @@ function drawSymbol(ctx, p, font) {
     }
     case 'button': {
       // 按鈕開關（煞車燈開關）：下方兩個接點圓圈，上方橫桿與按柄
-      const r = Math.min(w * 0.13, h * 0.2); circle(x0 + w * 0.27, y1 - r, r); circle(x0 + w * 0.73, y1 - r, r);
+      // pins：兩個圓心的 x（導線座標，同導線 +0.5 對齊像素中心）；沒給就照方框比例
+      const r = Math.min(w * 0.13, h * 0.2), [pa, pb] = p.pins ? p.pins.map(x => x + 0.5) : [x0 + w * 0.27, x0 + w * 0.73];
+      circle(pa, y1 - r, r); circle(pb, y1 - r, r);
       line([x0, y0 + h * 0.45], [x1, y0 + h * 0.45]); line([cx, y0], [cx, y0 + h * 0.45]);
       break;
     }

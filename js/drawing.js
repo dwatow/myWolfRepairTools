@@ -35,8 +35,33 @@ function rasterizeDrawing(drawing, opt = {}) {
   // 1. 所有線路的點擊帶；2. 所有線芯與圓點覆蓋在上面（無圓點的交叉處，點擊帶不會蓋掉另一條的線芯）
   for (const s of segs) { const r = half(s, hit); rect(s.x0 - r, s.y0 - r, s.x1 + r, s.y1 + r, i => { label[i] = s.net; }); }
   const lists = drawing.nets.map(() => []);
-  // 電纜段：整寬都是線芯
-  for (const s of segs) if (s.ch) rect(s.x0 - s.ch, s.y0 - s.ch, s.x1 + s.ch, s.y1 + s.ch, i => { label[i] = s.net; lists[s.net].push(i); });
+  // 電纜：整寬都是線芯，轉彎照 cableGeometry 畫成圓角（直線段兩端外擴半寬：自由端同 square 線端，接圓弧那端與圓弧重疊）
+  const cablePaths = [];
+  drawing.nets.forEach((net, k) => {
+    if (net.cable) for (const w of net.wires || []) cablePaths.push([k, w, net.half ?? cableHalf]);
+    for (const c of net.cables || []) cablePaths.push([k, c.path, c.half ?? cableHalf]);
+  });
+  for (const [k, p, ch] of cablePaths) {
+    const cg = cableGeometry(p, ch), mark = i => { label[i] = k; lists[k].push(i); };
+    cg.lines.forEach(([a, b], j) => {
+      // 沿線方向：電纜頭尾（自由端）外擴半寬，接圓弧那端不外擴；橫向整寬
+      const h = a[1] === b[1], s = h ? Math.sign(b[0] - a[0]) || 1 : Math.sign(b[1] - a[1]) || 1;
+      const ea = j === 0 ? ch : 0, eb = j === cg.lines.length - 1 ? ch : 0;
+      const p = h ? [a[0] - s * ea, b[0] + s * eb] : [a[1] - s * ea, b[1] + s * eb];
+      const lo = Math.round(Math.min(...p)), hi = Math.round(Math.max(...p));
+      if (h) rect(lo, a[1] - ch, hi, a[1] + ch, mark); else rect(a[0] - ch, lo, a[0] + ch, hi, mark);
+    });
+    for (const g of cg.arcs) {
+      // 圓心距離在 [r − 半寬, r + 半寬]、角度在圓弧範圍內的像素
+      const R = g.r + ch, lo = Math.max(0, g.r - ch);
+      rect(Math.floor(g.c[0] - R), Math.floor(g.c[1] - R), Math.ceil(g.c[0] + R), Math.ceil(g.c[1] + R), i => {
+        const dx = (i % W) - g.c[0], dy = ((i / W) | 0) - g.c[1], d = Math.hypot(dx, dy);
+        if (d < lo - 0.5 || d > R + 0.5) return;
+        let t = Math.atan2(dy, dx) - g.a0; while (t > Math.PI) t -= 2 * Math.PI; while (t < -Math.PI) t += 2 * Math.PI;
+        if (g.sweep > 0 ? t >= -0.01 && t <= g.sweep + 0.01 : t <= 0.01 && t >= g.sweep - 0.01) mark(i);
+      });
+    }
+  }
   // 一般導線：照 wireGeometry 的直線段與轉角圓弧。自由端往內縮 trim；接到別段（T 字、交叉）的那端外擴 core 補滿；轉角端接圓弧不外擴
   const geo = wireGeometry(drawing, opt.round ?? 6);
   for (const g of geo.lines) {
@@ -105,6 +130,26 @@ function wireGeometry(drawing, R = 6) {
   return { lines, arcs };
 }
 
+// 粗電纜的繪製幾何：折線的每個轉角改成圓弧，半徑 3 倍半寬；中間段最多用掉一半長度、頭尾段可用掉全長（另一端是端子）
+// 回傳 { lines: [[a, b], …]（依序、可能長度 0）, arcs: [{ c, r, a0, sweep }] }，lines[i] 之後接 arcs[i]
+function cableGeometry(path, half) {
+  const R = 3 * half, n = path.length, lines = [], arcs = [];
+  const len = i => Math.abs(path[i + 1][0] - path[i][0]) + Math.abs(path[i + 1][1] - path[i][1]);
+  const dir = i => [Math.sign(path[i + 1][0] - path[i][0]), Math.sign(path[i + 1][1] - path[i][1])];
+  let from = path[0];
+  for (let i = 1; i < n - 1; i++) {
+    const u = dir(i - 1), v = dir(i), p = path[i];
+    if (u[0] * v[0] + u[1] * v[1] !== 0) continue; // 同向接續，不是轉角
+    const r = Math.min(R, i - 1 === 0 ? len(i - 1) : len(i - 1) / 2, i + 1 === n - 1 ? len(i) : len(i) / 2);
+    const t1 = [p[0] - u[0] * r, p[1] - u[1] * r], t2 = [p[0] + v[0] * r, p[1] + v[1] * r], c = [t1[0] + v[0] * r, t1[1] + v[1] * r];
+    const a0 = Math.atan2(t1[1] - c[1], t1[0] - c[0]), a1 = Math.atan2(t2[1] - c[1], t2[0] - c[0]);
+    let sweep = a1 - a0; while (sweep > Math.PI) sweep -= 2 * Math.PI; while (sweep < -Math.PI) sweep += 2 * Math.PI;
+    lines.push([from, t1]); arcs.push({ c, r, a0, sweep }); from = t2;
+  }
+  lines.push([from, path[n - 1]]);
+  return { lines, arcs };
+}
+
 // 每條折線頭尾兩端是不是自由端：[[[頭, 尾], …每條折線], …每條線路網]
 // 端點落在同一線路網其他折線上（含端點、內部，容許 1 px）或有接點圓點，就不是自由端
 function segmentEnds(drawing) {
@@ -119,4 +164,4 @@ function segmentEnds(drawing) {
   });
 }
 
-if (typeof module !== 'undefined') module.exports = { rasterizeDrawing, segmentEnds, wireGeometry };
+if (typeof module !== 'undefined') module.exports = { rasterizeDrawing, segmentEnds, wireGeometry, cableGeometry };
