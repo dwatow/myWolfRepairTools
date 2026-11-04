@@ -6,6 +6,7 @@ const { PROJECT, DIAGRAM, loadImage, analyze } = require('../../.claude/skills/f
 const { netsToDrawing } = require('./draft');
 const { assertDraft, cutWires, dropMarkStrokes } = require('./marks');
 const { formatDrawing, headerOf, KEEP_FIELDS } = require('./write-drawing');
+const { applyNetsManual, MANUAL } = require('./nets-manual');
 
 const load = f => { const c = { window: {} }; vm.runInNewContext(fs.readFileSync(path.join(PROJECT, 'data', DIAGRAM, f), 'utf8'), c); return c.window; };
 const img = loadImage(), r = analyze(img);
@@ -13,6 +14,8 @@ const { drawing, dropped, outlines } = netsToDrawing(r, {
   W: img.width, H: img.height, image: img,
   components: load('components.js').WOLF_COMPONENTS || [], fixes: load('fixes.js').WOLF_FIXES || {},
 });
+// 線路網的人工修正（tools/redraw/nets-manual.js）
+for (const line of applyNetsManual(drawing, MANUAL[DIAGRAM])) console.log('  ' + line);
 const file = path.join(PROJECT, 'data', DIAGRAM, 'drawing.js');
 if (fs.existsSync(file)) {
   const old = fs.readFileSync(file, 'utf8');

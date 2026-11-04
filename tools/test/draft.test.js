@@ -64,3 +64,24 @@ test('電纜外框殘段另列 outlines、不畫', () => {
   assert.equal(drawing.nets.length, 1);
   assert.deepEqual(outlines, [8]);
 });
+
+test('nets-manual：移除、補線、合併', () => {
+  const { applyNetsManual } = require('../redraw/nets-manual.js');
+  const d = { size: [100, 100], nets: [
+    { code: 'G', ground: false, wires: [[[0, 0], [50, 0]], [[5, 0], [5, 9]]], dots: [] },
+    { code: 'R', ground: false, wires: [[[0, 50], [40, 50]]], dots: [] },
+    { code: 'R', cable: true, half: 7, ground: false, wires: [[[60, 50], [60, 90]]], dots: [] },
+  ] };
+  const log = applyNetsManual(d, {
+    remove: [[[5, 0], [5, 9]]],
+    add: [{ at: [40, 50], wires: [[[40, 50], [60, 50]]] }],
+    merge: [{ at: [[20, 50], [60, 70]], reason: 'x' }],
+  });
+  assert.deepEqual(d.nets[0].wires, [[[0, 0], [50, 0]]]);
+  assert.equal(d.nets.length, 2);
+  assert.deepEqual(d.nets[1].wires, [[[0, 50], [40, 50]], [[40, 50], [60, 50]]]);
+  assert.deepEqual(d.nets[1].cables, [{ path: [[60, 50], [60, 90]], half: 7 }]);
+  assert.equal(log.length, 3);
+  applyNetsManual(d, { remove: [[[5, 0], [5, 9]]], add: [{ at: [40, 50], wires: [[[40, 50], [60, 50]]] }], merge: [{ at: [[20, 50], [60, 70]] }] });
+  assert.equal(d.nets[1].wires.length, 2, '重複套用不會重複補線');
+});

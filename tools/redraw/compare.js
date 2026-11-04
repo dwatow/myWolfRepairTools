@@ -29,8 +29,8 @@ const near = (lab, [x, y]) => { for (let d = 0; d <= 2; d++) for (let dy = -d; d
 // 同 app.js renderSwitches 的 netOf：接腳座標 4 px 內的線路
 const near4 = (lab, [x, y]) => { for (let r = 0; r <= 4; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const k = lab[(y + dy) * W + x + dx]; if (k >= 0) return k; } return -1; };
 // 例外的 pick 對到哪條舊線路：該點的線路，或某段中點距 pick ≤ 3 px 的線路（中段被電纜蓋過的殘段，label 查不到）
-const excOf = root => EXC.find(e => near(old.label, e.pick) === root ||
-  old.segs.some(s => s.net === root && Math.abs(((s.x0 + s.x1) >> 1) - e.pick[0]) <= 3 && Math.abs(((s.y0 + s.y1) >> 1) - e.pick[1]) <= 3));
+const excOf = root => EXC.find(e => e.pick && (near(old.label, e.pick) === root ||
+  old.segs.some(s => s.net === root && Math.abs(((s.x0 + s.x1) >> 1) - e.pick[0]) <= 3 && Math.abs(((s.y0 + s.y1) >> 1) - e.pick[1]) <= 3)));
 const codeOf = new Map(); for (const s of old.segs) if (s.net >= 0 && s.netCode && !codeOf.has(s.net)) codeOf.set(s.net, s.netCode);
 const P = ([x, y]) => `(${x}, ${y})`;
 let allOk = true;

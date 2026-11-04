@@ -19,22 +19,28 @@ function rasterizeDrawing(drawing, opt = {}) {
         if (a[0] !== b[0] && a[1] !== b[1])
           throw new Error(`drawing.js 第 ${k} 條線路網（從 0 起算）的折線必須是水平或垂直：${JSON.stringify([a, b])}`);
         const fa = j === 1 && freeOf[k][wi][0], fb = j === wire.length - 1 && freeOf[k][wi][1], aFirst = a[0] + a[1] <= b[0] + b[1];
-        segs.push({ h: a[1] === b[1], x0: Math.min(a[0], b[0]), x1: Math.max(a[0], b[0]), y0: Math.min(a[1], b[1]), y1: Math.max(a[1], b[1]), net: k });
+        segs.push({ h: a[1] === b[1], x0: Math.min(a[0], b[0]), x1: Math.max(a[0], b[0]), y0: Math.min(a[1], b[1]), y1: Math.max(a[1], b[1]), net: k, ch: net.cable ? net.half ?? cableHalf : 0 });
         free.push(aFirst ? [fa, fb] : [fb, fa]);
       }
     });
+    // 一般線路網另帶的粗電纜（例：保險絲紅線與電瓶正極電纜是同一條線路）
+    for (const c of net.cables || []) for (let j = 1; j < c.path.length; j++) {
+      const a = c.path[j - 1], b = c.path[j];
+      segs.push({ h: a[1] === b[1], x0: Math.min(a[0], b[0]), x1: Math.max(a[0], b[0]), y0: Math.min(a[1], b[1]), y1: Math.max(a[1], b[1]), net: k, ch: c.half ?? cableHalf });
+      free.push([false, false]);
+    }
   });
-  const half = (k, normal) => drawing.nets[k].cable ? drawing.nets[k].half ?? cableHalf : normal;
+  const half = (s, normal) => s.ch || normal; // 電纜段的線芯與點擊帶都是電纜半寬
   // 矩形內的像素逐一交給 fn
   const rect = (x0, y0, x1, y1, fn) => {
     for (let y = Math.max(0, y0); y <= Math.min(H - 1, y1); y++)
       for (let x = Math.max(0, x0); x <= Math.min(W - 1, x1); x++) fn(y * W + x);
   };
   // 1. 所有線路的點擊帶；2. 所有線芯與圓點覆蓋在上面（無圓點的交叉處，點擊帶不會蓋掉另一條的線芯）
-  for (const s of segs) { const r = half(s.net, hit); rect(s.x0 - r, s.y0 - r, s.x1 + r, s.y1 + r, i => { label[i] = s.net; }); }
+  for (const s of segs) { const r = half(s, hit); rect(s.x0 - r, s.y0 - r, s.x1 + r, s.y1 + r, i => { label[i] = s.net; }); }
   const lists = drawing.nets.map(() => []);
   segs.forEach((s, j) => {
-    const r = half(s.net, core), L = lists[s.net], cable = drawing.nets[s.net].cable;
+    const r = half(s, core), L = lists[s.net], cable = s.ch > 0;
     // 沿線方向：自由端往內縮 trim（線段夠長時），接到別段的那端照常外擴 r 補滿轉角
     const len = s.h ? s.x1 - s.x0 : s.y1 - s.y0, cut = !cable && len > 2 * trim + 2;
     const lo = cut && free[j][0] ? trim : -r, hi = cut && free[j][1] ? trim : -r;
@@ -49,7 +55,7 @@ function rasterizeDrawing(drawing, opt = {}) {
       });
   });
   const cores = lists.map(L => Int32Array.from(new Set(L)).sort());
-  return { label, cores, segs };
+  return { label, cores, segs: segs.map(({ ch, ...s }) => s) }; // ch（電纜半寬）只在內部用
 }
 
 // 每條折線頭尾兩端是不是自由端：[[[頭, 尾], …每條折線], …每條線路網]

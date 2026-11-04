@@ -10,12 +10,11 @@ function drawBase(ctx, drawing, components, K) {
   const path = wire => { ctx.beginPath(); wire.forEach(([x, y], i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, x + 0.5, y + 0.5)); };
   const ends = segmentEnds(drawing);
   drawing.nets.forEach((net, k) => {
+    // 粗電纜：雙線外框（外圈深色、內圈白）。cable 線路網的 wires，以及一般線路網另帶的 cables
+    const tube = (w, half) => { path(w); ctx.strokeStyle = BASE_INK; ctx.lineWidth = 2 * half + 1; ctx.stroke(); path(w); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 * half - 3; ctx.stroke(); };
+    for (const c of net.cables || []) tube(c.path, c.half ?? 7);
     if (net.cable) {
-      const half = net.half ?? 7;
-      for (const w of net.wires) {
-        path(w); ctx.strokeStyle = BASE_INK; ctx.lineWidth = 2 * half + 1; ctx.stroke();
-        path(w); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 * half - 3; ctx.stroke();
-      }
+      for (const w of net.wires) tube(w, net.half ?? 7);
     } else {
       // 平頭線端：自由端（接到零件）切齊端點；接到同線路其他導線的那端延長半個線寬補滿轉角
       ctx.strokeStyle = BASE_INK; ctx.lineWidth = 3; ctx.lineCap = 'butt';

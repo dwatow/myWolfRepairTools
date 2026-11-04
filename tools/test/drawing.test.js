@@ -58,3 +58,10 @@ test('segmentEnds 判斷自由端', () => {
   const ends = segmentEnds({ nets: [{ wires: [[[0, 0], [10, 0]], [[5, 0], [5, 9]]], dots: [] }, { wires: [[[0, 20], [10, 20]]], dots: [[10, 20]] }] });
   assert.deepEqual(ends, [[[true, true], [false, true]], [[true, false]]]);
 });
+
+test('一般線路網可另帶粗電纜 cables', () => {
+  const r = rasterizeDrawing(D([{ code: 'R', wires: [[[5, 10], [30, 10]]], cables: [{ path: [[30, 10], [30, 35]], half: 4 }] }]));
+  assert.equal(r.label[at(34, 25)], 0, '電纜半寬 4');
+  assert.equal(r.label[at(35, 25)], -1);
+  assert.ok(r.cores[0].includes(at(33, 25)), '電纜整寬都是線芯');
+});
