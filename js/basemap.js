@@ -85,7 +85,9 @@ function drawMarks(ctx, drawing, font) {
     }
     return best;
   };
-  for (const m of drawing.inline || []) {
+  // 先畫三角形公端、再畫矩形母端：尖端線條伸進母端的那一點被母端的白底蓋掉（同原圖）
+  const inlineOrder = [...(drawing.inline || [])].sort((a, b) => (a.kind === 'plug' ? 0 : 1) - (b.kind === 'plug' ? 0 : 1));
+  for (const m of inlineOrder) {
     ctx.save(); ctx.translate(m.at[0] + 0.5, m.at[1] + 0.5);
     if (m.dir === 'v') ctx.rotate(Math.PI / 2);
     if (m.flip) ctx.scale(-1, 1);
