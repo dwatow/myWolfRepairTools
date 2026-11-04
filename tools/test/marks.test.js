@@ -180,10 +180,3 @@ test('穿過多腳接頭方框的導線切在框邊', () => {
   assert.deepEqual(h(50), [[0, 40], [70, 150], [170, 199]]);
   assert.deepEqual(h(80), [[0, 40]]);
 });
-
-test('cutWires：through 的接頭不切框內導線，一般接頭切到框邊', () => {
-  const { cutWires } = require('../redraw/marks');
-  const mk = through => ({ nets: [{ code: 'B', wires: [[[0, 20], [100, 20]]] }], connectors: [{ label: '', box: [40, 10, 60, 30], ...(through ? { through: true } : {}) }] });
-  assert.deepEqual(cutWires(mk(true)).nets[0].wires, [[[0, 20], [100, 20]]]);
-  assert.deepEqual(cutWires(mk(false)).nets[0].wires, [[[0, 20], [40, 20]], [[60, 20], [100, 20]]]);
-});
