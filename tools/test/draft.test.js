@@ -56,3 +56,11 @@ test('電纜輸出', () => {
   const { drawing } = mk([{ h: false, x0: 0, x1: 0, y0: 0, y1: 20, net: 10000000, netCode: 'B', ground: true }], { fixes });
   assert.deepEqual(drawing.nets[0], { code: 'B', cable: true, half: 9, ground: true, wires: [[[0, 0], [0, 20]]], dots: [] });
 });
+
+test('電纜外框殘段另列 outlines、不畫', () => {
+  const fixes = { cables: [{ code: 'B', half: 9, path: [[50, 10], [50, 60]] }] };
+  const segs = [{ h: false, x0: 50, x1: 50, y0: 10, y1: 60, net: 10000000, netCode: 'B' }, seg(8, 41, 55, 42, 72, { netCode: null })];
+  const { drawing, outlines } = mk(segs, { fixes });
+  assert.equal(drawing.nets.length, 1);
+  assert.deepEqual(outlines, [8]);
+});

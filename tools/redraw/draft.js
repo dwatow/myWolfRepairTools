@@ -2,6 +2,7 @@
 // 純函式：netsToDrawing(r, { W, H, image, components, fixes }) -> { drawing, dropped }
 //   r = { segs, label }：label 已清掉 staticAreas 與元件名稱範圍（同 lib.analyze）
 //   dropped：整批例外（所有線段都在某個元件框內，視為元件符號或文字筆畫）的舊線路根編號
+//   outlines：粗電纜雙線外框沒被電纜路徑蓋到的殘段（未標色、整條在電纜範圍外擴 OUTLINE_PAD 內），不畫
 const MERGE_OFF = 2;   // 共線合併：中心座標差 ≤ 2 px
 const MERGE_GAP = 2;   // 共線合併：間隙 ≤ 2 px
 const SNAP = 6;        // 端點吸附到同線路垂直方向線段的距離
@@ -9,6 +10,8 @@ const DOT_END = 3;     // T 字：端點距另一段兩端都 ≥ 3 px 才算落
 const FIX_DOT = 8;     // fixes.dots 投影到中心線的最大距離
 const BOX_PAD = 14;    // 元件框外擴（同 app.js 的 buildComponents）
 const CABLE_ROOT = 10000000;
+const CABLE_HALF = 7;  // 同 app.js 的 CABLE_HALF
+const OUTLINE_PAD = 20; // 電纜外框殘段：電纜範圍（半寬）再外擴幾 px（外框圓角會超出路徑末端約 10～25 px）
 
 function netsToDrawing(r, { W, H, image, components = [], fixes = {} }) {
   const K = W / 1800;
@@ -22,6 +25,11 @@ function netsToDrawing(r, { W, H, image, components = [], fixes = {} }) {
   const byNet = new Map();
   for (const s of r.segs) if (s.net >= 0 && sum.has(s.net)) { if (!byNet.has(s.net)) byNet.set(s.net, []); byNet.get(s.net).push(s); }
   const boxes = components.map(c => c.box.map(v => v * K)).map(([a, b, c, d]) => [a - BOX_PAD, b - BOX_PAD, c + BOX_PAD, d + BOX_PAD]);
+  const cableRects = (fixes.cables || []).flatMap(c => c.path.slice(1).map((q, j) => {
+    const p = c.path[j], h = (c.half ?? CABLE_HALF) + OUTLINE_PAD;
+    return [Math.min(p[0], q[0]) - h, Math.min(p[1], q[1]) - h, Math.max(p[0], q[0]) + h, Math.max(p[1], q[1]) + h];
+  }));
+  const inCable = s => cableRects.some(([a, b, c, d]) => s.x0 >= a && s.x1 <= c && s.y0 >= b && s.y1 <= d);
   const inBox = s => boxes.some(([a, b, c, d]) => s.x0 >= a && s.x1 <= c && s.y0 >= b && s.y1 <= d);
 
   // 3 點以上的人工連線折線，依起點所在的線路歸入
@@ -33,7 +41,7 @@ function netsToDrawing(r, { W, H, image, components = [], fixes = {} }) {
     if (!extra.has(k)) extra.set(k, []); extra.get(k).push(path);
   }
 
-  const nets = [], dropped = [], solid = solidAt(image);
+  const nets = [], dropped = [], outlines = [], solid = solidAt(image);
   for (const root of [...byNet.keys()].sort((a, b) => a - b)) {
     const segs = byNet.get(root);
     const code = segs.find(s => s.netCode)?.netCode ?? null;
@@ -46,6 +54,7 @@ function netsToDrawing(r, { W, H, image, components = [], fixes = {} }) {
       nets.push(net); continue;
     }
     if (segs.every(inBox)) { dropped.push(root); continue; }
+    if (code === null && segs.every(inCable)) { outlines.push(root); continue; }
     const [R, G, B, n] = sum.get(root).map((v, i, a) => i < 3 ? v / a[3] : v);
     const ground = segs.some(s => s.ground) || code === 'G' || (code === null && G > R + 25 && G > B + 15);
     const { hs, vs } = centerlines(segs);
@@ -57,7 +66,7 @@ function netsToDrawing(r, { W, H, image, components = [], fixes = {} }) {
     }
     nets.push({ code, ground, wires: [...lines, ...(extra.get(root) || [])], dots });
   }
-  return { drawing: { size: [W, H], nets, connectors: [], inline: [], labels: [], texts: [] }, dropped };
+  return { drawing: { size: [W, H], nets, connectors: [], inline: [], labels: [], texts: [] }, dropped, outlines };
 }
 
 // 某點 ±2 px 內的線路根
