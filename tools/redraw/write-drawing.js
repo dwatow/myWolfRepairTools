@@ -7,12 +7,13 @@ const HEADER = `// 線路圖資料：以線路網為單位寫明導線（折線�
 // parts：元件內的圖元 { type: 'symbol', kind, box, dir? } | { type: 'pin', name, at, vertical?, textAt? } | { type: 'text', text, at, size, vertical?, bold? }
 //        | { type: 'connector', label, box } | { type: 'frame', box }（kind 見 js/basemap.js 的 drawSymbol）
 // 草稿由 tools/redraw/bootstrap.js、add-marks.js 從影像辨識結果產生，之後以手改為準`;
+// 一個欄位的寫法：`  name: [`、每筆一行、`  ],`；線路網加上編號註解
+const list = (name, arr, note = name === 'nets') => [`  ${name}: [`, ...arr.map((x, k) => `    ${J(x)},${note ? ` // ${k}` : ''}`), '  ],'];
 function formatDrawing(d, header = HEADER) {
-  const list = (name, arr, note) => [`  ${name}: [`, ...arr.map((x, k) => `    ${J(x)},${note ? ` // ${k}` : ''}`), '  ],'];
   return `${header}
 window.WOLF_DRAWING = {
   size: ${J(d.size)},
-${[...list('nets', d.nets, true), ...['connectors', 'inline', 'labels', 'texts', 'parts'].flatMap(f => list(f, d[f] || []))].join('\n')}
+${[...list('nets', d.nets), ...['connectors', 'inline', 'labels', 'texts', 'parts'].flatMap(f => list(f, d[f] || []))].join('\n')}
 };
 `;
 }
@@ -22,4 +23,13 @@ const headerOf = text => text.slice(0, text.indexOf('window.WOLF_DRAWING')).trim
 const applyParts = (d, parts) => Object.assign(d, { parts });
 // 線路網以外、由人工判讀產生的欄位：bootstrap.js 重產線路網時原樣保留
 const KEEP_FIELDS = ['connectors', 'inline', 'labels', 'texts', 'parts'];
-module.exports = { formatDrawing, headerOf, HEADER, applyParts, KEEP_FIELDS };
+// 在既有檔案文字上只替換 fields 這幾個欄位（整段 `  name: [` … `  ],`），其他欄位與手寫註解原樣保留；檔案裡沒有該欄位就加在結尾 `};` 前
+function replaceFields(text, d, fields) {
+  for (const f of fields) {
+    const block = list(f, d[f] || []).join('\n') + '\n';
+    const re = new RegExp(`^  ${f}: \\[\\n[\\s\\S]*?^  \\],\\n`, 'm');
+    text = re.test(text) ? text.replace(re, () => block) : text.replace(/^};\s*$/m, () => block + '};');
+  }
+  return text;
+}
+module.exports = { formatDrawing, headerOf, HEADER, applyParts, KEEP_FIELDS, replaceFields };

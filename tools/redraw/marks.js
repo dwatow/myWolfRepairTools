@@ -85,6 +85,8 @@ function classify(m, image, label) {
 }
 
 // 標記 → drawing 欄位；文字依相鄰導線的線色填字，無法確定的放進 review
+// 線色代號的字寬（以字數計）：/ 很窄，算半個字（同 markRects 的切缺口寬度）
+const codeChars = code => [...code].reduce((a, ch) => a + (ch === '/' ? 0.5 : 1), 0);
 function attach(marks, drawing, image, label) {
   const segs = [];
   drawing.nets.forEach((n, k) => { for (const w of n.wires || []) for (let j = 1; j < w.length; j++) segs.push({ k, h: w[j][1] === w[j - 1][1], a: w[j - 1], b: w[j] }); });
@@ -120,7 +122,7 @@ function attach(marks, drawing, image, label) {
       if (!s) { review.push({ box, kind: 'text', reason: '附近找不到共線的導線' }); continue; }
       const code = drawing.nets[s.k].code, vertical = !s.h;
       if (!code) { review.push({ box, kind: 'text', net: s.k, vertical, reason: '導線沒有線色' }); continue; }
-      const len = vertical ? m.y1 - m.y0 + 1 : m.x1 - m.x0 + 1, n = code.length;
+      const len = vertical ? m.y1 - m.y0 + 1 : m.x1 - m.x0 + 1, n = codeChars(code);
       if (len < CHAR_MIN * n || len > CHAR_MAX * n) { review.push({ box, kind: 'text', net: s.k, vertical, code, reason: `寬度 ${len} px 和線色 ${code}（${n} 字）不符` }); continue; }
       labels.push({ text: code, at, vertical });
     }
@@ -199,4 +201,4 @@ function dropMarkStrokes(d) {
   return n0 - d.nets.length;
 }
 
-module.exports = { findMarks, classify, attach, assertDraft, cutWires, markRects, strokeRects, dropMarkStrokes };
+module.exports = { findMarks, classify, attach, assertDraft, cutWires, markRects, strokeRects, dropMarkStrokes, codeChars };

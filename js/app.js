@@ -20,7 +20,6 @@ const WIRE_RGB = Object.fromEntries(Object.entries(WIRE).map(([k, [hex]]) => [k,
 const codeName = c => c.split('/').map(p => WIRE[p] ? WIRE[p][1] : p).join('/');
 const OUTLINE = [43, 47, 51];
 const THIN = 1, THICK = 3;         // 一般線條與選取線條的半徑（像素）
-const CABLE_HALF = 7; // 粗電纜預設半寬（像素），個別電纜可用 half 覆寫
 
 const $ = id => document.getElementById(id);
 const viewer = $('viewer'), canvas = $('view'), ctx = canvas.getContext('2d'), statusEl = $('status');
@@ -44,6 +43,8 @@ async function init() {
   for (const f of DATA_FILES) await loadScript(f).catch(e => { if (!OPTIONAL.some(o => f.endsWith(o))) throw e; });
   COMPONENTS = window.WOLF_COMPONENTS;
   const drawing = window.WOLF_DRAWING;
+  const problems = partProblems(drawing.parts);
+  if (problems.length) throw new Error('元件圖元資料有誤：' + problems.join('；'));
   [IW, IH] = drawing.size;
   base = document.createElement('canvas'); base.width = IW; base.height = IH;
   const b = base.getContext('2d', { willReadFrequently: true });
@@ -59,6 +60,7 @@ async function init() {
   const paintNote = loadPaint();
   $('loading').hidden = true;
   try { saved = JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); } catch {}
+  if (!Array.isArray(saved)) saved = []; // 資料格式不對（例如被手改成物件）就當作沒有已存選取
   if (saved.some(isDetail)) { saved = saved.filter(e => !isDetail(e)); storeSaved(); } // 舊版的細節項目：功能已淘汰
   renderComps(); renderLegend(); renderSwitches(); rebuildOverlay(); fit(); renderList(); renderSaved();
   select(null); // 開場不選任何東西
@@ -556,7 +558,9 @@ function renderSaved() {
     const li = document.createElement('li'), name = document.createElement('span'), count = document.createElement('span');
     name.className = 'name'; name.textContent = entry.name;
     count.className = 'count';
-    count.textContent = ` ${entry.picks.length} 條`; name.append(count);
+    // 條數以現在找得到的線為準（座標落在已移除的筆畫上就找不到）；有找不到的另外註明
+    const found = netsOf(entry).length, lost = entry.picks.length - found;
+    count.textContent = ` ${found} 條` + (lost > 0 ? `（${lost} 筆找不到線）` : ''); name.append(count);
     const go = document.createElement('button'); go.className = 'icon-btn'; go.type = 'button'; go.textContent = '載入';
     go.onclick = () => {
       const ks = netsOf(entry);
@@ -644,4 +648,4 @@ for (const d of DIAGRAMS) {
 }
 
 new ResizeObserver(() => { const had = canvas.width > 0; resize(); if (!had) fit(); }).observe(viewer);
-init().catch(err => { $('loading').textContent = '圖片載入失敗：' + err.message; });
+init().catch(err => { $('loading').textContent = '線路圖載入失敗：' + err.message; });

@@ -41,7 +41,7 @@ function netsToDrawing(r, { W, H, image, components = [], fixes = {} }) {
     if (!extra.has(k)) extra.set(k, []); extra.get(k).push(path);
   }
 
-  const nets = [], dropped = [], outlines = [], solid = solidAt(image);
+  const nets = [], roots = [], dropped = [], outlines = [], solid = solidAt(image); // roots[i]：nets[i] 來自哪條舊線路
   for (const root of [...byNet.keys()].sort((a, b) => a - b)) {
     const segs = byNet.get(root);
     const code = segs.find(s => s.netCode)?.netCode ?? null;
@@ -51,7 +51,7 @@ function netsToDrawing(r, { W, H, image, components = [], fixes = {} }) {
       if (c.half !== undefined) net.half = c.half;
       net.ground = !!c.ground || net.code === 'G';
       net.wires = [c.path]; net.dots = [];
-      nets.push(net); continue;
+      nets.push(net); roots.push(root); continue;
     }
     if (segs.every(inBox)) { dropped.push(root); continue; }
     if (code === null && segs.every(inCable)) { outlines.push(root); continue; }
@@ -64,9 +64,9 @@ function netsToDrawing(r, { W, H, image, components = [], fixes = {} }) {
     for (const [x, y] of fixes.dots || []) {
       const p = project(hs, vs, x, y); if (p && !dots.some(d => d[0] === p[0] && d[1] === p[1])) dots.push(p);
     }
-    nets.push({ code, ground, wires: [...lines, ...(extra.get(root) || [])], dots });
+    nets.push({ code, ground, wires: [...lines, ...(extra.get(root) || [])], dots }); roots.push(root);
   }
-  return { drawing: { size: [W, H], nets, connectors: [], inline: [], labels: [], texts: [] }, dropped, outlines };
+  return { drawing: { size: [W, H], nets, connectors: [], inline: [], labels: [], texts: [] }, dropped, outlines, roots };
 }
 
 // 某點 ±2 px 內的線路根

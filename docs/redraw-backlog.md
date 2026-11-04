@@ -1,6 +1,6 @@
 # 以資料重繪線路圖：待辦清單
 
-更新：2026-11-04（第 5 階段完成）
+更新：2026-11-05（已知小問題修正）
 設計文件：`docs/superpowers/specs/2026-11-03-redraw-diagram-design.md`
 
 重繪的五個階段都已完成；以下是仍可改進的地方。
@@ -64,17 +64,22 @@
 
 ## 三、已知的小問題
 
-| 問題                                                  | 影響                           | 位置                                         |
-| ----------------------------------------------------- | ------------------------------ | -------------------------------------------- |
-| 元件圖元缺座標（`box`）時，整頁停在載入中             | 手改資料寫錯就打不開           | `js/basemap.js` 的 `drawParts`／`drawSymbol` |
-| 資料錯誤（例如斜線）顯示為「圖片載入失敗：」          | 容易誤會成圖片的問題           | `js/app.js` 的 `init`                        |
-| `compare.js` 沒有比對「接地」欄位                     | 手改 `ground` 改錯時抓不到     | `tools/redraw/compare.js`                    |
-| `add-parts.js` 會重新排版整個 `drawing.js`            | 寫在資料物件內的註解會遺失     | `tools/redraw/write-drawing.js`              |
-| `add-marks.js --force` 重跑時，文字位置會偏移 1～4 px | 重產標記後要再目視檢查         | `tools/redraw/add-marks.js`                  |
-| 判斷文字寬度時，`/` 被當成完整字元                    | `GR` 和 `G/R` 互相配錯時抓不到 | `tools/redraw/marks.js` 的 `attach`          |
-| 已存選取若包含被移除的接頭筆畫，清單仍照舊顯示條數    | 顯示的條數比實際多             | `js/app.js` 的 `renderSaved`                 |
-| 電纜預設半寬 7 寫在 `basemap.js` 與 `app.js` 兩處     | 以後只改一處會對不上           | `js/basemap.js`、`js/app.js`                 |
-| localStorage 的已存選取不是陣列時，頁面載入失敗       | 改版前就有的問題               | `js/app.js` 的 `init`                        |
+2026-11-05 已修正原表 9 項中的 8 項：
+- 元件圖元缺座標時，頁面會指出是哪一筆、缺什麼。
+- 載入錯誤改顯示「線路圖載入失敗」。
+- `compare.js` 加上比對接地欄位。
+- `add-parts.js`、`recut.js` 只改寫自己負責的欄位，手寫註解會保留。
+- `/` 算半個字寬。
+- 已存選取的條數以找得到的線為準。
+- 電纜半寬只定義在 `js/drawing.js`。
+- 已存選取不是陣列時，頁面照常載入。
+
+| 問題 | 影響 | 位置 |
+| --- | --- | --- |
+| `add-marks.js --force` 重跑時，164 個線色文字中有 18 個沿文字方向偏移 1～4 px。原因是萃取時會扣掉已畫的導線，導線切缺口後，文字旁的原圖導線墨水被算進文字範圍 | 不再重跑這支工具（skill 已寫明）；要根治得重寫萃取時文字範圍的判斷 | `tools/redraw/add-marks.js`、`marks.js` 的 `findMarks` |
+| `adding-switch-tables` 的說明寫「PA12C 還沒有開關表」，實際上已經有 | skill 觸發條件不準 | `.claude/skills/adding-switch-tables/SKILL.md` |
+| `adding-switch-tables` 找接腳座標還在用舊辨識（`analyze`） | 接腳可能落在重繪後導線的缺口裡，點了不亮 | 同上 |
+| `comp-highlight.js` 的元件名稱打錯時，只顯示「沒有結果」 | 看不出是名稱錯了 | `tools/redraw/comp-highlight.js` |
 
 ## 四、待使用者決定
 
