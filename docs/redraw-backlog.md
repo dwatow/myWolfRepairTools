@@ -1,9 +1,9 @@
 # 以資料重繪線路圖：待辦清單
 
-更新：2026-11-04（`redraw-polish` 分支）
+更新：2026-11-04（第 5 階段完成）
 設計文件：`docs/superpowers/specs/2026-11-03-redraw-diagram-design.md`
 
-下一步：第 4 階段（移除原圖）。
+重繪的五個階段都已完成；以下是仍可改進的地方。
 
 ## 一、畫面加強（第 3 階段收尾）
 
@@ -51,27 +51,16 @@
 
 ## 二、後續階段
 
-### 第 4 階段：移除原圖（進行中）
+### 第 4 階段：移除原圖（已完成，2026-11-04）
 
-計畫：`docs/superpowers/plans/2026-11-04-redraw-phase4-remove-original.md`
+- 網頁不再載入原圖與舊辨識資料；`strips.js` 只留在本機（`.gitignore`）。
+- git 歷史已用 `git filter-repo` 移除 `strips.js`，GitHub repo 刪除重建，只推乾淨的 `main`。
+- 備份（含原圖，只在本機）：`../wolfElectronic-backup-2026-11-04.git`、`../wolfElectronic-strips-backup/`。
 
-- 已完成（`redraw-phase4` 分支）：
-  - 網頁不再載入 `strips.js`、`js/nets.js`、`anchors.js`、`fixes.js`，移除 `?dev=1` 原圖對照與 `staticAreas` 的執行期使用。
-  - `strips.js` 移出 git，加進 `.gitignore`，只留在本機給比對工具用（使用者決定）。
-  - `sheet.js` 改為自己載入本機原圖；沒有原圖時，比對工具顯示說明。
-  - `legacy.js` 保留（只有座標；使用者瀏覽器裡的舊版塗色要靠它轉移）。
-- 待做：
-  - 改寫 git 歷史（`git filter-repo`），把 `strips.js` 從所有 commit 移除。
-  - 由 `dwatow` 刪除並重建同名 repo（PR 紀錄會留住舊 commit），推上乾淨的歷史，確認後改回公開。
+### 第 5 階段：工具與文件（已完成，2026-11-04）
 
-### 第 5 階段：工具與文件
-
-- 改寫或淘汰 `.claude/skills/fixing-wire-nets` 和 `.claude/skills/editing-diagram-image`。這兩個 skill 還是針對掃描圖辨識寫的，要改成「編輯 `drawing.js` 與各個 `*-manual.js`」的流程。
-- 更新 `js/diagrams.js` 檔案清單的說明。
-- 在專案 CLAUDE.md 或 README 記錄：
-  - `tools/redraw/` 各工具的用途。
-  - 修改後必跑的檢查：`compare.js`、`check-paint.js`、`check-import.js`、`node --test 'tools/test/*.test.js'`。
-  - 用 Chrome 的檢查腳本只能一支一支跑。
+- 兩個舊 skill 合併成 `editing-wiring-drawing`；共用腳本搬到 `tools/redraw/`。
+- 新增專案 `CLAUDE.md`（必跑檢查與規則）、`tools/redraw/comp-highlight.js`（元件亮起範圍）。
 
 ## 三、已知的小問題
 
@@ -97,5 +86,5 @@
 
 ## 五、分支與 PR
 
-- 第 2、3 階段已合併到 `main`（PR #1～#3）。
-- `chris-wang-furuke` 已是協作者，可以直接用 `gh` 開 PR。
+- 舊 repo 的 PR #1～#6 已隨 repo 重建刪除，紀錄存在本機 `../wolfElectronic-backup-2026-11-04-prs.json`；新 repo 的 PR 從 #1 重新編號，合併 commit 訊息裡的 #1～#6 指的是舊 PR。
+- `chris-wang-furuke` 是協作者，可以直接用 `gh` 開 PR。
