@@ -1,4 +1,4 @@
-// 由資料畫出線路圖底圖（取代原廠掃描圖）：白底、導線（深灰）、粗電纜（雙線外框）、接點圓點、元件方框與名稱
+// 由資料畫出線路圖底圖（取代原廠掃描圖）：白底、導線（深灰）、粗電纜（雙線外框）、接點圓點、元件名稱與元件圖元（parts）、導線上的標記
 // drawing：WOLF_DRAWING；components：WOLF_COMPONENTS（box、label 以圖寬 1800 為基準）；K = 圖寬 / 1800
 const BASE_INK = '#3a3f44', BASE_BOX = '#6b7176';
 function drawBase(ctx, drawing, components, K) {
@@ -27,7 +27,8 @@ function drawBase(ctx, drawing, components, K) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const c of components) {
     const [a, b, cc, d] = c.box.map(v => v * K);
-    ctx.strokeStyle = BASE_BOX; ctx.lineWidth = 1.5; ctx.strokeRect(a, b, cc - a, d - b);
+    // 有 parts 時外框由 parts 的 frame 決定（原圖有外框才畫）；舊資料沒有 parts 就照舊畫元件方框
+    if (!drawing.parts) { ctx.strokeStyle = BASE_BOX; ctx.lineWidth = 1.5; ctx.strokeRect(a, b, cc - a, d - b); }
     const [x0, y0, x1, y1] = c.label ? c.label.map(v => v * K) : [a + 4, b + 4, cc - 4, b + 26];
     let size = Math.min(28, (y1 - y0) * 0.9);
     ctx.font = `${size}px ${font}`;
@@ -35,6 +36,7 @@ function drawBase(ctx, drawing, components, K) {
     if (w > x1 - x0) { size *= (x1 - x0) / w; ctx.font = `${size}px ${font}`; }
     ctx.fillStyle = BASE_INK; ctx.fillText(c.name, (x0 + x1) / 2, (y0 + y1) / 2);
   }
+  drawParts(ctx, drawing.parts || [], font);
   drawMarks(ctx, drawing, font);
   ctx.restore();
 }
@@ -83,4 +85,115 @@ function drawMarks(ctx, drawing, font) {
     ctx.fillText(t.text, t.at[0], t.at[1]);
   }
   ctx.restore();
+}
+
+// 元件內的圖元（drawing.parts）：通用符號、接腳、文字、元件上的接頭、外框。符號只描線不填白（免得蓋住穿進元件的導線）
+function drawParts(ctx, parts, font) {
+  ctx.save();
+  ctx.strokeStyle = BASE_INK; ctx.fillStyle = BASE_INK; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const text = (t, x, y, size, vertical, bold) => {
+    ctx.font = `${bold ? 'bold ' : ''}${size}px ${font}`;
+    if (!vertical) return ctx.fillText(t, x, y);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(-Math.PI / 2); ctx.fillText(t, 0, 0); ctx.restore();
+  };
+  for (const p of parts) {
+    if (p.type === 'frame') { const [a, b, c, d] = p.box; ctx.save(); ctx.strokeStyle = BASE_BOX; ctx.lineWidth = 1.5; ctx.strokeRect(a, b, c - a, d - b); ctx.restore(); }
+    else if (p.type === 'text') text(p.text, p.at[0], p.at[1], p.size || 18, p.vertical, p.bold);
+    else if (p.type === 'pin') {
+      const [x, y] = p.at, r = 7;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.save(); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.restore(); ctx.stroke();
+      // 名稱預設在圓圈上方；textAt 可指定位置
+      ctx.font = `bold 20px ${font}`; const len = ctx.measureText(p.name).width;
+      const [tx, ty] = p.textAt || (p.vertical ? [x, y - r - 5 - len / 2] : [x, y - r - 14]);
+      text(p.name, tx, ty, 20, p.vertical, true);
+    } else if (p.type === 'connector') {
+      const [x0, y0, x1, y1] = p.box;
+      ctx.save(); ctx.fillStyle = '#ffffff'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0); ctx.restore(); ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+      if (p.label) { ctx.font = `16px ${font}`; const vert = ctx.measureText(p.label).width + 6 > x1 - x0; text(p.label, (x0 + x1) / 2, (y0 + y1) / 2, 16, vert); }
+    } else if (p.type === 'symbol') { ctx.save(); drawSymbol(ctx, p, font); ctx.restore(); }
+  }
+  ctx.restore();
+}
+
+// 通用電路符號：畫在 box 內（全解析度座標），依 box 大小縮放
+function drawSymbol(ctx, p, font) {
+  const [x0, y0, x1, y1] = p.box, w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const circle = (x, y, r) => { ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.stroke(); };
+  const line = (...pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); };
+  // 一排半圓（線圈）：從 (ax, ay) 到 (bx, by)，n 個，凸向 side（1 / -1）
+  const humps = (ax, ay, bx, by, n, side = 1) => {
+    const len = Math.hypot(bx - ax, by - ay), ang = Math.atan2(by - ay, bx - ax), r = len / n / 2;
+    ctx.save(); ctx.translate(ax, ay); ctx.rotate(ang); ctx.beginPath();
+    for (let i = 0; i < n; i++) ctx.arc(r * (2 * i + 1), 0, r, Math.PI, 0, side < 0);
+    ctx.stroke(); ctx.restore();
+  };
+  // 燈絲：兩個小圈
+  const filament = (x, y, s) => { humps(x - s, y, x + s, y, 2, 1); line([x - s, y], [x - s, y + s * 0.8]); line([x + s, y], [x + s, y + s * 0.8]); };
+  switch (p.kind) {
+    case 'lamp': {
+      // 燈泡圓在 dir 的反側，燈座矩形朝 dir
+      const dir = p.dir || 'r', hor = dir === 'l' || dir === 'r', r = Math.min(hor ? h : w, (hor ? w : h) * 0.6) / 2;
+      const c = { r: [x0 + r, cy], l: [x1 - r, cy], d: [cx, y0 + r], u: [cx, y1 - r] }[dir];
+      circle(c[0], c[1], r); filament(c[0], c[1] - r * 0.15, r * 0.4);
+      const bh = r * 0.9;
+      if (dir === 'r') ctx.strokeRect(c[0] + r, cy - bh / 2, x1 - c[0] - r, bh);
+      if (dir === 'l') ctx.strokeRect(x0, cy - bh / 2, c[0] - r - x0, bh);
+      if (dir === 'd') ctx.strokeRect(cx - bh / 2, c[1] + r, bh, y1 - c[1] - r);
+      if (dir === 'u') ctx.strokeRect(cx - bh / 2, y0, bh, c[1] - r - y0);
+      break;
+    }
+    case 'lamp2': {
+      ctx.beginPath(); ctx.ellipse(cx, cy, w / 2, h / 2, 0, 0, 2 * Math.PI); ctx.stroke();
+      filament(cx - w * 0.18, cy, h * 0.18); filament(cx + w * 0.18, cy, h * 0.18);
+      break;
+    }
+    case 'horn': { const r = Math.min(w, h) / 2; circle(cx, cy, r); circle(cx, cy, r * 0.55); circle(cx, cy, r * 0.2); break; }
+    case 'gauge': { const r = Math.min(w, h) / 2; circle(cx, cy, r); line([cx - r * 0.5, cy + r * 0.5], [cx + r * 0.6, cy - r * 0.6]); break; }
+    case 'resistor': {
+      ctx.strokeRect(x0, y0, w, h);
+      const n = 6, pts = [[cx, y0 + h * 0.15]];
+      for (let i = 1; i <= n; i++) pts.push([cx + (i % 2 ? 1 : -1) * w * 0.25, y0 + h * 0.15 + (h * 0.7) * i / (n + 1)]);
+      pts.push([cx, y1 - h * 0.15]); line(...pts);
+      break;
+    }
+    case 'coil': { if (w >= h) humps(x0, cy, x1, cy, Math.max(3, Math.round(w / h * 1.5))); else humps(cx, y0, cx, y1, Math.max(3, Math.round(h / w * 1.5))); break; }
+    case 'transformer': {
+      humps(x0, cy - h * 0.12, x1, cy - h * 0.12, 4, 1); humps(x0, cy + h * 0.12, x1, cy + h * 0.12, 4, -1);
+      line([x0, cy - h * 0.04], [x1, cy - h * 0.04]); line([x0, cy + h * 0.04], [x1, cy + h * 0.04]);
+      break;
+    }
+    case 'alternator': {
+      const r = Math.min(w, h) / 2; circle(cx, cy, r);
+      humps(cx - r * 0.3, cy - r * 0.55, cx - r * 0.3, cy + r * 0.55, 4, -1); humps(cx + r * 0.3, cy - r * 0.55, cx + r * 0.3, cy + r * 0.55, 4, -1);
+      break;
+    }
+    case 'motor': { const r = Math.min(w, h) / 2; circle(cx, cy, r); ctx.font = `${Math.round(r)}px ${font}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('M', cx, cy); break; }
+    case 'battery': {
+      ctx.strokeRect(x0, y0 + h * 0.25, w, h * 0.75);
+      const r = Math.min(w * 0.12, h * 0.12); circle(x0 + w * 0.3, y0 + h * 0.25, r); circle(x0 + w * 0.7, y0 + h * 0.25, r);
+      ctx.font = `bold ${Math.round(r * 1.4)}px ${font}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('−', x0 + w * 0.3, y0 + h * 0.25); ctx.fillText('+', x0 + w * 0.7, y0 + h * 0.25);
+      break;
+    }
+    case 'fuse': {
+      ctx.strokeRect(x0, y0, w, h);
+      ctx.beginPath(); for (let i = 0; i <= 40; i++) { const t = i / 40, x = x0 + w * (0.15 + 0.7 * t), y = cy - Math.sin(t * 2 * Math.PI) * h * 0.25; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+      break;
+    }
+    case 'diode': {
+      const s = Math.min(w, h) * 0.4;
+      line([cx - s / 2, cy - s / 2], [cx + s / 2, cy], [cx - s / 2, cy + s / 2], [cx - s / 2, cy - s / 2]); line([cx + s / 2, cy - s / 2], [cx + s / 2, cy + s / 2]);
+      line([x0, cy], [cx - s / 2, cy]); line([cx + s / 2, cy], [x1, cy]);
+      break;
+    }
+    case 'ground': { for (let i = 0; i < 3; i++) { const half = w / 2 * (1 - i * 0.33), y = y0 + h * i / 2.5; line([cx - half, y], [cx + half, y]); } break; }
+    case 'lug': { const r = Math.min(w / 2, h * 0.3); circle(cx, y0 + r, r); circle(cx, y0 + r, r * 0.4); line([cx - r * 0.4, y0 + 2 * r], [cx - r * 0.4, y1]); line([cx + r * 0.4, y0 + 2 * r], [cx + r * 0.4, y1]); break; }
+    case 'plug': {
+      const s = h / 2;
+      line([x0, cy - s], [x0 + w * 0.4, cy], [x0, cy + s], [x0, cy - s]);
+      line([x1, cy - s], [x1 - w * 0.4, cy], [x1, cy + s], [x1, cy - s]);
+      break;
+    }
+  }
 }
