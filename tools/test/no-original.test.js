@@ -10,3 +10,8 @@ test('網頁不載入原圖與舊辨識資料', () => {
   assert.ok(m, 'js/diagrams.js 要有 DATA_FILES 陣列');
   assert.deepEqual(JSON.parse(m[1]), ['drawing', 'legacy', 'components', 'switches']);
 });
+
+test('網頁說明不再提到掃描圖辨識或對照原圖', () => {
+  const html = read('index.html');
+  for (const s of ['掃描圖', '自動辨識', '對照原圖']) assert.ok(!html.includes(s), `index.html 不應含「${s}」`);
+});
