@@ -121,8 +121,8 @@ function drawParts(ctx, parts, font) {
     if (p.type === 'frame') { const [a, b, c, d] = p.box; ctx.save(); ctx.lineWidth = p.w || 2.5; ctx.strokeRect(a, b, c - a, d - b); ctx.restore(); }
     else if (p.type === 'text') text(p.text, p.at[0], p.at[1], p.size || 18, p.vertical, p.bold);
     else if (p.type === 'pin') {
-      const [x, y] = p.at, r = 10; // 同原圖接腳圓圈
-      ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.save(); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.restore(); ctx.stroke();
+      const [x, y] = p.at, r = 11; // 同原圖接腳圓圈；+0.5 同導線對齊像素中心，圓心才會對著線中心
+      ctx.beginPath(); ctx.arc(x + 0.5, y + 0.5, r, 0, 2 * Math.PI); ctx.save(); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.restore(); ctx.stroke();
       // 名稱預設在圓圈上方；textAt 可指定位置
       ctx.font = `bold 20px ${font}`; const len = ctx.measureText(p.name).width;
       const [tx, ty] = p.textAt || (p.vertical ? [x, y - r - 5 - len / 2] : [x, y - r - 14]);
