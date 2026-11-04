@@ -189,6 +189,12 @@ function drawSymbol(ctx, p, font) {
     }
     case 'ground': { for (let i = 0; i < 3; i++) { const half = w / 2 * (1 - i * 0.33), y = y0 + h * i / 2.5; line([cx - half, y], [cx + half, y]); } break; }
     case 'lug': { const r = Math.min(w / 2, h * 0.3); circle(cx, y0 + r, r); circle(cx, y0 + r, r * 0.4); line([cx - r * 0.4, y0 + 2 * r], [cx - r * 0.4, y1]); line([cx + r * 0.4, y0 + 2 * r], [cx + r * 0.4, y1]); break; }
+    case 'button': {
+      // 按鈕開關（煞車燈開關）：下方兩個接點圓圈，上方橫桿與按柄
+      const r = Math.min(w * 0.13, h * 0.2); circle(x0 + w * 0.27, y1 - r, r); circle(x0 + w * 0.73, y1 - r, r);
+      line([x0, y0 + h * 0.45], [x1, y0 + h * 0.45]); line([cx, y0], [cx, y0 + h * 0.45]);
+      break;
+    }
     case 'plug': {
       const s = h / 2;
       line([x0, cy - s], [x0 + w * 0.4, cy], [x0, cy + s], [x0, cy - s]);
