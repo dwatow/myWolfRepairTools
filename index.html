@@ -24,7 +24,6 @@
   <label class="toggle"><input type="checkbox" id="hide-ground"> 隱藏接地線</label>
   <label class="toggle"><input type="checkbox" id="show-codes" checked> 依線色上色</label>
   <label class="toggle"><input type="checkbox" id="dim"> 淡化底圖</label>
-  <label class="toggle" id="dev-original-row" hidden><input type="checkbox" id="dev-original"> 疊原圖對照（開發用）</label>
 </div>
 
 <main>
@@ -86,11 +85,10 @@
       <p class="empty" id="empty">選取元件或線條後，點上面的色票就能把它塗色保留下來。</p>
       <button class="btn" id="clear" type="button" hidden>全部清除</button>
     </details>
-    <p class="note">線路是從掃描圖自動辨識：有圓點的交會處視為相連，沒有圓點的交叉視為不相連，並會跨過文字標籤與接頭。線色依圖上的標籤人工判讀，不同線色的線不會被連在一起；接地線為 G（綠）線。少數地方可能誤連或斷開，請對照原圖判讀。</p>
+    <p class="note">線路圖依原廠線路圖重新繪製：有圓點的交會處相連，沒有圓點的交叉不相連，線路會跨過文字標籤與接頭。線色依圖上的標籤標示，不同線色的線不會被連在一起；接地線為 G（綠）線。如有與實車不符之處，請以實車為準。</p>
   </aside>
 </main>
 
-<script src="js/nets.js"></script>
 <script src="js/drawing.js"></script>
 <script src="js/basemap.js"></script>
 <script src="js/diagrams.js"></script>

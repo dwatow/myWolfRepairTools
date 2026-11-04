@@ -1,6 +1,6 @@
-// 目前這張圖的資料（WOLF_DRAWING、COMPONENTS、ANCHORS）在 init 依 DIAGRAM 載入 data/<id>/ 後才有值
+// 目前這張圖的資料（WOLF_DRAWING、COMPONENTS）在 init 依 DIAGRAM 載入 data/<id>/ 後才有值
 // COMPONENTS 的元件位置：以圖寬 1800 為基準的 [x0, y0, x1, y1]，載入後依實際解析度換算
-let COMPONENTS = [], ANCHORS, STATIC_AREAS = [];
+let COMPONENTS = [];
 
 const COLORS = [
   { hex: '#e5322d', name: '紅' }, { hex: '#f08c00', name: '橘' }, { hex: '#e6c200', name: '黃' },
@@ -34,7 +34,6 @@ let hover = null, view = { s: 1, tx: 0, ty: 0 };
 const hideGround = () => $('hide-ground').checked;
 
 // ---- 載入資料：底圖與線路都由 data/<id>/drawing.js 產生 ----
-const loadImg = src => new Promise((ok, err) => { const i = new Image(); i.onload = () => ok(i); i.onerror = err; i.src = src; });
 const loadScript = src => new Promise((ok, err) => {
   const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => err(new Error('載入失敗 ' + src));
   document.body.append(s);
@@ -43,8 +42,7 @@ const OPTIONAL = ['/switches.js', '/legacy.js']; // 可省略的資料檔
 async function init() {
   window.WOLF_SWITCHES = null; window.WOLF_LEGACY = null;
   for (const f of DATA_FILES) await loadScript(f).catch(e => { if (!OPTIONAL.some(o => f.endsWith(o))) throw e; });
-  COMPONENTS = window.WOLF_COMPONENTS; ANCHORS = window.WOLF_ANCHORS;
-  ({ staticAreas: STATIC_AREAS = [] } = window.WOLF_FIXES || {});
+  COMPONENTS = window.WOLF_COMPONENTS;
   const drawing = window.WOLF_DRAWING;
   [IW, IH] = drawing.size;
   base = document.createElement('canvas'); base.width = IW; base.height = IH;
@@ -276,9 +274,6 @@ function draw() {
   ctx.imageSmoothingEnabled = view.s < 2;
   // 有選取時，其他線條與底圖淡化，只有選取的線保持不透明
   ctx.globalAlpha = selection ? 0.18 : $('dim').checked ? 0.3 : 1; ctx.drawImage(base, 0, 0); ctx.globalAlpha = 1;
-  if (original && $('dev-original').checked) { ctx.globalAlpha = 0.4; ctx.drawImage(original, 0, 0); ctx.globalAlpha = 1; }
-  // 固定區域：以原圖亮度重畫，不隨選取變暗
-  for (const [x0, y0, x1, y1] of STATIC_AREAS) { const w = x1 - x0 + 1, h = y1 - y0 + 1; ctx.fillStyle = '#ffffff'; ctx.fillRect(x0, y0, w, h); ctx.drawImage(base, x0, y0, w, h, x0, y0, w, h); }
   // 選取的元件：符號筆畫與名稱文字以原圖亮度疊上
   if (selection && selection.kind === 'comp') { const L = compLayer(selection.i); if (L) ctx.drawImage(L.c, L.x, L.y); }
   if (hideGround()) ctx.drawImage(groundLayer, 0, 0);
@@ -488,22 +483,6 @@ function renderList() {
   $('clear').hidden = entries.length === 0;
 }
 $('clear').onclick = () => { paint = {}; storePaint(); rebuildOverlay(); renderList(); select(selection); };
-
-// ---- 開發用：疊原圖對照（網址加 ?dev=1 才出現；第 4 階段移除）----
-// 第一次勾選時才載入 strips.js（7 條橫條上下拼接後逆時針轉 90°）
-let original = null;
-if (new URLSearchParams(location.search).get('dev') === '1') $('dev-original-row').hidden = false;
-$('dev-original').onchange = async () => {
-  if ($('dev-original').checked && !original) {
-    await loadScript(`data/${DIAGRAM.id}/strips.js`);
-    const imgs = await Promise.all(window.WOLF_STRIPS.map(loadImg)), W0 = imgs[0].width;
-    const c = document.createElement('canvas'); c.width = imgs.reduce((a, i) => a + i.height, 0); c.height = W0;
-    const g = c.getContext('2d'); g.translate(0, W0); g.rotate(-Math.PI / 2);
-    let y = 0; for (const i of imgs) { g.drawImage(i, 0, y); y += i.height; }
-    original = c;
-  }
-  draw();
-};
 
 // ---- 塗色的儲存 ----
 // lostPaint：v4 裡找不到線的項目（例如手改 drawing.js 移動了線），原樣保留，不因之後的塗色被刪掉

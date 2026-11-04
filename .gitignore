@@ -2,3 +2,6 @@ wolf*selections.json
 
 # 原始 PDF 有版權，不納入版本控制、不隨網站公開
 *.pdf
+
+# 原廠掃描圖（版權）：只留在本機給比對工具用，不進 git、網站不載入
+data/*/strips.js

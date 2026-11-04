@@ -1,5 +1,5 @@
 // 線路圖清單：每張圖的資料各放在 data/<id>/（drawing、legacy、components、anchors、fixes、switches），彼此獨立；legacy、switches 可省略
-// strips.js（原廠掃描圖）只在開發用的原圖對照（?dev=1）才載入
+// 網頁只載入 drawing、legacy、components、switches；anchors、fixes、strips（原廠掃描圖，不在 git 內）只給 tools/ 的比對工具用
 // 用網址參數 ?d=<id> 切換，沒有指定時開上次看的那張
 const DIAGRAMS = [
   {
@@ -28,6 +28,6 @@ const DIAGRAM = (() => {
 try {
   localStorage.setItem("wolf125-diagram", DIAGRAM.id);
 } catch {}
-const DATA_FILES = ["drawing", "legacy", "components", "anchors", "fixes", "switches"].map(
+const DATA_FILES = ["drawing", "legacy", "components", "switches"].map(
   (f) => `data/${DIAGRAM.id}/${f}.js`,
 );
