@@ -9,7 +9,8 @@ const COLORS = [
 ];
 // PA12B 沿用原本的鍵，舊的塗色與儲存的選取不會遺失；其他圖各自分開存
 const KEY_SUFFIX = DIAGRAM.id === 'PA12B' ? '' : '-' + DIAGRAM.id;
-const STORE_KEY = 'wolf125-paint-v3' + KEY_SUFFIX, SAVED_KEY = 'wolf125-saved-v1' + KEY_SUFFIX;
+// 塗色：v4 以「線上一點的座標」儲存 [{ pick, color }]；v3（舊版，以影像辨識的線路編號儲存）只讀不寫、不刪
+const PAINT_KEY = 'wolf125-paint-v4' + KEY_SUFFIX, LEGACY_PAINT_KEY = 'wolf125-paint-v3' + KEY_SUFFIX, SAVED_KEY = 'wolf125-saved-v1' + KEY_SUFFIX;
 // 線色代號（依原圖「線色對照表」），雙色線為「主色/條紋色」
 const WIRE = {
   B: ['#1b1b1b', '黑'], Y: ['#f5c400', '黃'], L: ['#1f5fd6', '藍'], G: ['#16924a', '綠'], R: ['#e0251b', '紅'], W: ['#ffffff', '白'],
@@ -26,7 +27,7 @@ const viewer = $('viewer'), canvas = $('view'), ctx = canvas.getContext('2d'), s
 let base, baseData, overlay, overlayCtx, groundLayer, selLayer = null, hoverLayer = null;
 const showCodes = () => $('show-codes').checked;
 let IW = 0, IH = 0, label, nets = [];             // nets[k] = { pixels, x0, y0, x1, y1, segs, code, ground }，k 是 drawing.nets 的順序
-let paint = {};                                    // paint[netIndex] = hex
+let paint = {};                                    // paint[netIndex] = hex（存檔時轉成座標）
 let selection = null;                              // { kind: 'net', k } | { kind: 'comp', i } | { kind: 'multi', ks }
 let saved = [];                                    // 已儲存的選取：{ name, savedAt, picks: [[x, y]] }（以線上一點的座標記錄，線路編號變動也找得回來）
                                                    // 細節：{ name, kind: 'detail', savedAt, rects: [[x0, y0, x1, y1]], pixels: [[x, y]] }，與同名的選取成對
@@ -60,11 +61,12 @@ async function init() {
   buildGround();
 
   overlay = document.createElement('canvas'); overlay.width = IW; overlay.height = IH; overlayCtx = overlay.getContext('2d');
-  try { const saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); if (saved.n === nets.length) paint = saved.paint || {}; } catch {}
+  const paintNote = loadPaint();
   $('loading').hidden = true;
   try { saved = JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); } catch {}
   renderComps(); renderLegend(); renderSwitches(); rebuildOverlay(); fit(); renderList(); renderSaved();
   select(null); // 開場不選任何東西
+  if (paintNote) statusEl.textContent = paintNote;
 }
 
 // 線路網：線芯像素（上色用）、外框、線段，以及資料裡的線色與接地
@@ -198,7 +200,6 @@ function rebuildOverlay() {
   const img = overlayCtx.createImageData(IW, IH);
   drawNets(img, 0, 0, IW, visibleNets(nets.map((_, k) => k)), THIN);
   overlayCtx.putImageData(img, 0, 0);
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ n: nets.length, paint })); } catch {}
   draw();
 }
 
@@ -303,6 +304,7 @@ function draw() {
   ctx.imageSmoothingEnabled = view.s < 2;
   // 有選取時，其他線條與底圖淡化，只有選取的線保持不透明
   ctx.globalAlpha = selection ? 0.18 : $('dim').checked ? 0.3 : 1; ctx.drawImage(base, 0, 0); ctx.globalAlpha = 1;
+  if (original && $('dev-original').checked) { ctx.globalAlpha = 0.4; ctx.drawImage(original, 0, 0); ctx.globalAlpha = 1; }
   // 固定區域：以原圖亮度重畫，不隨選取變暗
   for (const [x0, y0, x1, y1] of STATIC_AREAS) { const w = x1 - x0 + 1, h = y1 - y0 + 1; ctx.fillStyle = '#ffffff'; ctx.fillRect(x0, y0, w, h); ctx.drawImage(base, x0, y0, w, h, x0, y0, w, h); }
   // 選取的元件：符號筆畫與名稱文字以原圖亮度疊上
@@ -418,7 +420,7 @@ for (const c of [...COLORS, { hex: null, name: '清除顏色' }]) {
   if (c.hex) b.style.background = c.hex; else b.textContent = '✕';
   b.onclick = () => {
     for (const k of selectedNets(selection)) { if (c.hex) paint[k] = c.hex; else delete paint[k]; }
-    rebuildOverlay(); renderList(); select(selection);
+    storePaint(); rebuildOverlay(); renderList(); select(selection);
   };
   swatchBox.append(b);
 }
@@ -530,13 +532,50 @@ function renderList() {
     const go = document.createElement('button'); go.className = 'icon-btn'; go.type = 'button'; go.textContent = '選取';
     go.onclick = () => select({ kind: 'net', k: +k });
     const rm = document.createElement('button'); rm.className = 'icon-btn'; rm.type = 'button'; rm.textContent = '移除';
-    rm.onclick = () => { delete paint[k]; rebuildOverlay(); renderList(); select(selection); };
+    rm.onclick = () => { delete paint[k]; storePaint(); rebuildOverlay(); renderList(); select(selection); };
     li.append(chip, name, go, rm); list.append(li);
   }
   $('empty').hidden = entries.length > 0;
   $('clear').hidden = entries.length === 0;
 }
 $('clear').onclick = () => { paint = {}; rebuildOverlay(); renderList(); select(selection); };
+
+// ---- 開發用：疊原圖對照（網址加 ?dev=1 才出現；第 4 階段移除）----
+// 第一次勾選時才載入 strips.js（7 條橫條上下拼接後逆時針轉 90°）
+let original = null;
+if (new URLSearchParams(location.search).get('dev') === '1') $('dev-original-row').hidden = false;
+$('dev-original').onchange = async () => {
+  if ($('dev-original').checked && !original) {
+    await loadScript(`data/${DIAGRAM.id}/strips.js`);
+    const imgs = await Promise.all(window.WOLF_STRIPS.map(loadImg)), W0 = imgs[0].width;
+    const c = document.createElement('canvas'); c.width = imgs.reduce((a, i) => a + i.height, 0); c.height = W0;
+    const g = c.getContext('2d'); g.translate(0, W0); g.rotate(-Math.PI / 2);
+    let y = 0; for (const i of imgs) { g.drawImage(i, 0, y); y += i.height; }
+    original = c;
+  }
+  draw();
+};
+
+// ---- 塗色的儲存 ----
+const storePaint = () => { try { localStorage.setItem(PAINT_KEY, JSON.stringify(Object.entries(paint).map(([k, color]) => ({ pick: pickOf(+k), color })))); } catch {} };
+// 讀塗色：有 v4 就照座標找線；沒有 v4 而有舊版 v3 時，用 legacy.js（舊線路編號 → 座標）轉成 v4。回傳要顯示的訊息
+function loadPaint() {
+  let v4 = null, v3 = null;
+  try { v4 = JSON.parse(localStorage.getItem(PAINT_KEY)); v3 = JSON.parse(localStorage.getItem(LEGACY_PAINT_KEY)); } catch {}
+  const at = ([x, y]) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < IW && y < IH ? label[y * IW + x] : -1;
+  if (Array.isArray(v4)) {
+    let lost = 0;
+    for (const e of v4) { const k = at(e.pick || []); if (k >= 0) paint[k] = e.color; else lost++; }
+    return lost ? `有 ${lost} 筆塗色找不到對應的線` : '';
+  }
+  if (!v3 || !v3.paint || !Object.keys(v3.paint).length) return '';
+  const L = window.WOLF_LEGACY;
+  if (!L || v3.n !== L.n) return `舊塗色的線路數（${v3.n}）和記錄（${L ? L.n : '無'}）不符，沒有轉移`;
+  let n = 0;
+  for (const [k, color] of Object.entries(v3.paint)) { const p = L.picks[+k], j = p ? at(p) : -1; if (j >= 0) { paint[j] = color; n++; } }
+  storePaint();
+  return `已把舊塗色轉成新格式（${n} 條）`;
+}
 
 // ---- 已儲存的選取 ----
 const storeSaved = () => { try { localStorage.setItem(SAVED_KEY, JSON.stringify(saved)); } catch {} };
