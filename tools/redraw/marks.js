@@ -135,7 +135,7 @@ function assertDraft(text, force) {
 
 // 文字與單線接頭所在的導線切開留缺口（同原圖；舊辨識把字母的橫筆畫連進了線段）
 // 文字大小以 basemap.js 的粗體 21px 估計：每字 14 px、「/」7 px，高 16，沿線方向兩側再留 CUT_PAD；
-// plug 30×22、socket 45×21 不留白（同原圖，導線直接接到接頭邊緣）。markRects 回傳 [x0, y0, x1, y1, 留白]
+// plug 30×22、socket 45×21 不留白（同原圖，導線直接接到接頭邊緣）；多腳接頭方框切到框邊。markRects 回傳 [x0, y0, x1, y1, 留白]
 const CUT_PAD = 6, MIN_PIECE = 6;
 function markRects(d) {
   const rects = [];
@@ -148,6 +148,8 @@ function markRects(d) {
     const [len, wid] = m.kind === 'plug' ? [30, 22] : [45, 21], [hw, hh] = m.dir === 'v' ? [wid / 2, len / 2] : [len / 2, wid / 2];
     rects.push([...[m.at[0] - hw, m.at[1] - hh, m.at[0] + hw, m.at[1] + hh].map(Math.round), 0]);
   }
+  // 多腳接頭方框（導線上的與元件上的）：框內的導線切掉，導線停在框邊線上（留白 −1 = 切到框邊為止）
+  for (const c of [...(d.connectors || []), ...(d.parts || []).filter(p => p.type === 'connector')]) rects.push([...c.box, -1]);
   return rects;
 }
 function cutWires(d) {

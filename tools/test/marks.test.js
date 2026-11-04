@@ -169,3 +169,14 @@ test('bootstrap 重產線路網時保留的欄位含 parts', () => {
   assert.deepEqual(KEEP_FIELDS, ['connectors', 'inline', 'labels', 'texts', 'parts']);
   assert.match(require('fs').readFileSync(require('path').join(__dirname, '../redraw/bootstrap.js'), 'utf8'), /for \(const f of KEEP_FIELDS\)/);
 });
+
+test('穿過多腳接頭方框的導線切在框邊', () => {
+  const { cutWires } = require('../redraw/marks.js');
+  const d = { size: [W, H], nets: [{ code: 'B', wires: [[[0, 50], [199, 50]], [[0, 80], [60, 80]]] }],
+    labels: [], inline: [], connectors: [{ label: '3P', box: [40, 30, 70, 90] }],
+    parts: [{ type: 'connector', label: '2P', box: [150, 40, 170, 60] }] };
+  cutWires(d);
+  const h = y => d.nets[0].wires.filter(w => w[0][1] === y).map(w => [w[0][0], w[1][0]]);
+  assert.deepEqual(h(50), [[0, 40], [70, 150], [170, 199]]);
+  assert.deepEqual(h(80), [[0, 40]]);
+});
