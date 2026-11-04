@@ -24,4 +24,15 @@ check('n 不符不轉移', Object.keys(r.paint).length === 0 && r.status.include
 r = evalInPage(probe, { diagram: D, fresh: true, head: head({ [V4]: [{ pick: L.picks[k], color: '#00ff00' }] }) });
 check('v4 往返', JSON.stringify(r.paint) === JSON.stringify({ [want]: '#00ff00' }), r);
 
+r = evalInPage(() => { document.getElementById('clear').click(); return localStorage.getItem('wolf125-paint-v4'); },
+  { diagram: D, fresh: true, head: head({ [V4]: [{ pick: L.picks[k], color: '#00ff00' }] }) });
+check('全部清除後存檔為空', r === '[]', r);
+
+r = evalInPage(() => nets.map((_, k) => k).filter(k => { const [x, y] = pickOf(k); return label[y * IW + x] !== k; }), { diagram: D, fresh: true });
+check('pickOf 落在自己的線上', r.length === 0, r);
+
+r = evalInPage(() => { select({ kind: 'net', k: 0 }); document.querySelector('#swatches .swatch').click(); return JSON.parse(localStorage.getItem('wolf125-paint-v4')); },
+  { diagram: D, fresh: true, head: head({ [V4]: [{ pick: [0, 0], color: '#123456' }] }) });
+check('找不到線的塗色保留', r.some(e => e.color === '#123456') && r.length === 2, r);
+
 process.exitCode = ok ? 0 : 1;

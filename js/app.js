@@ -472,7 +472,7 @@ function renderList() {
   $('empty').hidden = entries.length > 0;
   $('clear').hidden = entries.length === 0;
 }
-$('clear').onclick = () => { paint = {}; rebuildOverlay(); renderList(); select(selection); };
+$('clear').onclick = () => { paint = {}; storePaint(); rebuildOverlay(); renderList(); select(selection); };
 
 // ---- 開發用：疊原圖對照（網址加 ?dev=1 才出現；第 4 階段移除）----
 // 第一次勾選時才載入 strips.js（7 條橫條上下拼接後逆時針轉 90°）
@@ -491,29 +491,35 @@ $('dev-original').onchange = async () => {
 };
 
 // ---- 塗色的儲存 ----
-const storePaint = () => { try { localStorage.setItem(PAINT_KEY, JSON.stringify(Object.entries(paint).map(([k, color]) => ({ pick: pickOf(+k), color })))); } catch {} };
+// lostPaint：v4 裡找不到線的項目（例如手改 drawing.js 移動了線），原樣保留，不因之後的塗色被刪掉
+let lostPaint = [];
+const storePaint = () => { try { localStorage.setItem(PAINT_KEY, JSON.stringify([...Object.entries(paint).map(([k, color]) => ({ pick: pickOf(+k), color })), ...lostPaint])); } catch {} };
 // 讀塗色：有 v4 就照座標找線；沒有 v4 而有舊版 v3 時，用 legacy.js（舊線路編號 → 座標）轉成 v4。回傳要顯示的訊息
 function loadPaint() {
   let v4 = null, v3 = null;
   try { v4 = JSON.parse(localStorage.getItem(PAINT_KEY)); v3 = JSON.parse(localStorage.getItem(LEGACY_PAINT_KEY)); } catch {}
   const at = ([x, y]) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < IW && y < IH ? label[y * IW + x] : -1;
   if (Array.isArray(v4)) {
-    let lost = 0;
-    for (const e of v4) { const k = at(e.pick || []); if (k >= 0) paint[k] = e.color; else lost++; }
-    return lost ? `有 ${lost} 筆塗色找不到對應的線` : '';
+    for (const e of v4) { const k = at(e.pick || []); if (k >= 0) paint[k] = e.color; else lostPaint.push(e); }
+    return lostPaint.length ? `有 ${lostPaint.length} 筆塗色找不到對應的線（保留在儲存資料中）` : '';
   }
   if (!v3 || !v3.paint || !Object.keys(v3.paint).length) return '';
   const L = window.WOLF_LEGACY;
   if (!L || v3.n !== L.n) return `舊塗色的線路數（${v3.n}）和記錄（${L ? L.n : '無'}）不符，沒有轉移`;
-  let n = 0;
-  for (const [k, color] of Object.entries(v3.paint)) { const p = L.picks[+k], j = p ? at(p) : -1; if (j >= 0) { paint[j] = color; n++; } }
+  let n = 0, skip = 0;
+  for (const [k, color] of Object.entries(v3.paint)) { const p = L.picks[+k], j = p ? at(p) : -1; if (j >= 0) { paint[j] = color; n++; } else skip++; }
   storePaint();
-  return `已把舊塗色轉成新格式（${n} 條）`;
+  return `已把舊塗色轉成新格式（${n} 條）` + (skip ? `，略過 ${skip} 筆（線已不存在）` : '');
 }
 
 // ---- 已儲存的選取 ----
 const storeSaved = () => { try { localStorage.setItem(SAVED_KEY, JSON.stringify(saved)); } catch {} };
-const pickOf = k => { const p = nets[k].pixels[nets[k].pixels.length >> 1]; return [p % IW, (p / IW) | 0]; };
+// 線上一點：從線芯中點往兩側找第一個仍屬於這條線的像素（交叉、T 字處的線芯可能被後畫的線覆蓋）
+const pickOf = k => {
+  const px = nets[k].pixels, m = px.length >> 1;
+  for (let d = 0; d <= m + 1; d++) for (const i of [m - d, m + d]) if (i >= 0 && i < px.length && label[px[i]] === k) return [px[i] % IW, (px[i] / IW) | 0];
+  return [px[m] % IW, (px[m] / IW) | 0];
+};
 const netsOf = entry => [...new Set(entry.picks.map(([x, y]) => label[y * IW + x]).filter(k => k >= 0))];
 // 名稱決定能做什麼：新名稱只能新增；已存在的名稱只能修改（覆蓋）或刪除
 // 舊版「圈選細節」的項目（kind: 'detail'）：功能已淘汰，載入與匯入時略過
