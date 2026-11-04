@@ -1,3 +1,5 @@
+// 粗電纜預設半寬（px），個別電纜可用 half 覆寫；底圖、點陣化、比對工具共用
+const CABLE_HALF = 7;
 // 線路圖資料（data/<圖>/drawing.js 的 WOLF_DRAWING）點陣化：每個像素屬於哪條線路網
 // 純函式，Node 與瀏覽器共用。nets 的陣列順序就是線路編號。
 // 回傳 label（點擊用，-1 = 不屬於任何線路）、cores[k]（線路 k 的線芯＋圓點像素索引，上色用）、segs（每段折線）
@@ -6,7 +8,7 @@ function rasterizeDrawing(drawing, opt = {}) {
   const core = opt.core ?? 1;           // 線芯半寬（px）：亮線、上色的粗細
   const hit = opt.hit ?? 3;             // 點擊帶半寬（px）：已存的座標偏離線芯幾 px 也找得到
   const dot = opt.dot ?? 4;             // 接點圓點半徑（px）
-  const cableHalf = opt.cableHalf ?? 7; // 粗電纜預設半寬（px），個別電纜可用 half 覆寫
+  const cableHalf = opt.cableHalf ?? CABLE_HALF;
   const label = new Int32Array(W * H).fill(-1), segs = [];
 
   const trim = opt.trim ?? 2;           // 自由端（導線接到零件、沒接其他導線）的線芯縮短幾 px：上色時往外擴的外框剛好切齊端點
@@ -150,6 +152,23 @@ function cableGeometry(path, half) {
   return { lines, arcs };
 }
 
+// 元件圖元（drawing.parts）各類型必要的欄位；缺了就畫不出來，載入時先檢查、列出哪一筆缺什麼
+const PART_FIELDS = {
+  symbol: ['box'], frame: ['box'], connector: ['box'], rect: ['box'],
+  pin: ['at'], text: ['at'], line: ['pts'], hatch: ['pts'],
+  circle: ['c', 'r'], ellipse: ['c', 'rx', 'ry'], loops: ['from', 'to'],
+};
+function partProblems(parts) {
+  const out = [];
+  (parts || []).forEach((p, i) => {
+    const need = PART_FIELDS[p.type];
+    const who = `parts 第 ${i} 筆（${p.comp ? p.comp + '，' : ''}${p.type}）`;
+    if (!need) { out.push(`${who}類型不明`); return; }
+    for (const f of need) if (p[f] === undefined || p[f] === null) out.push(`${who}缺少 ${f}`);
+  });
+  return out;
+}
+
 // 每條折線頭尾兩端是不是自由端：[[[頭, 尾], …每條折線], …每條線路網]
 // 端點落在同一線路網其他折線上（含端點、內部，容許 1 px）或有接點圓點，就不是自由端
 function segmentEnds(drawing) {
@@ -164,4 +183,4 @@ function segmentEnds(drawing) {
   });
 }
 
-if (typeof module !== 'undefined') module.exports = { rasterizeDrawing, segmentEnds, wireGeometry, cableGeometry };
+if (typeof module !== 'undefined') module.exports = { rasterizeDrawing, segmentEnds, wireGeometry, cableGeometry, partProblems, CABLE_HALF };

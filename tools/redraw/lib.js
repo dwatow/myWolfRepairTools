@@ -64,7 +64,7 @@ function analyze(img, dir = PROJECT) {
   const anchorDir = fs.existsSync(path.join(dir, DATA, 'anchors.js')) ? dir : PROJECT;
   const anchors = loadWindow([`${DATA}/anchors.js`], anchorDir).WOLF_ANCHORS;
   const r = require(file).analyzeNets(img, { anchors, dots: fixes.dots || [], links: fixes.links || [], erase: fixes.erase || [], ink: fixes.ink || [] });
-  addCables(r, fixes.cables || [], img.width, img.height, dir);
+  addCables(r, fixes.cables || [], img.width, img.height);
   // 同 app.js：固定區域（staticAreas）與元件名稱文字範圍內的像素不算線路
   const compDir = fs.existsSync(path.join(dir, DATA, 'components.js')) ? dir : PROJECT;
   const comps = loadWindow([`${DATA}/components.js`], compDir).WOLF_COMPONENTS || [], K = img.width / 1800;
@@ -77,10 +77,9 @@ function analyze(img, dir = PROJECT) {
 // 線路網數：有像素的線路網（與 app.js 的 nets.length、acceptance.js 的 nets: 相同算法）
 function countNets(r) { const s = new Set(); for (const k of r.label) if (k >= 0) s.add(k); return s.size; }
 
-// 粗電纜：路徑範圍內的像素整塊歸給該電纜（與 js/app.js 的 addCables 相同；半寬預設讀 app.js 的 CABLE_HALF）
-function addCables(r, cables, IW, IH, dir) {
-  const m = fs.readFileSync(path.join(dir, 'js/app.js'), 'utf8').match(/const CABLE_HALF = (\d+)/);
-  const HALF = m ? +m[1] : 7;
+// 粗電纜：路徑範圍內的像素整塊歸給該電纜（舊版 app.js 的 addCables 做法；半寬預設用 js/drawing.js 的 CABLE_HALF）
+function addCables(r, cables, IW, IH) {
+  const HALF = require('../../js/drawing.js').CABLE_HALF;
   cables.forEach((c, i) => {
     const root = 10000000 + i;
     for (let j = 1; j < c.path.length; j++) {

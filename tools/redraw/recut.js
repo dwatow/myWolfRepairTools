@@ -3,7 +3,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const { PROJECT, DIAGRAM } = require('./lib');
 const { cutWires, dropMarkStrokes } = require('./marks');
-const { formatDrawing, headerOf } = require('./write-drawing');
+const { replaceFields } = require('./write-drawing');
 const { applyNetsManual, MANUAL } = require('./nets-manual');
 const { tidyNet } = require('./draft');
 const file = path.join(PROJECT, 'data', DIAGRAM, 'drawing.js'), text = fs.readFileSync(file, 'utf8'), win = {};
@@ -12,5 +12,5 @@ const d = win.WOLF_DRAWING, before = d.nets.reduce((a, n) => a + n.wires.length,
 for (const line of applyNetsManual(d, MANUAL[DIAGRAM])) console.log('  ' + line); // 線路網的人工修正
 for (const net of d.nets) tidyNet(net); // 疊在一起、差 1～2 px 的段落整理成乾淨的轉角
 cutWires(d); const dropped = dropMarkStrokes(d);
-fs.writeFileSync(file, formatDrawing(d, headerOf(text)));
+fs.writeFileSync(file, replaceFields(text, d, ['nets'])); // 只改寫 nets 那一段，其他欄位與手寫註解不動
 console.log(`${DIAGRAM}：導線段 ${before} → ${d.nets.reduce((a, n) => a + n.wires.length, 0)}；移除未標色線路 ${dropped} 條；線路網 ${d.nets.length} 條`);

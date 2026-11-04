@@ -17,9 +17,9 @@ function drawBase(ctx, drawing, components, K) {
       g.lines.forEach(([, b], j) => { ctx.lineTo(b[0] + 0.5, b[1] + 0.5); const a = g.arcs[j]; if (a) ctx.arc(a.c[0] + 0.5, a.c[1] + 0.5, a.r, a.a0, a.a0 + a.sweep, a.sweep < 0); });
     };
     const tube = (w, half) => { tubePath(w, half); ctx.strokeStyle = BASE_INK; ctx.lineWidth = 2 * half + 1; ctx.stroke(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 * half - 3; ctx.stroke(); };
-    for (const c of net.cables || []) tube(c.path, c.half ?? 7);
+    for (const c of net.cables || []) tube(c.path, c.half ?? CABLE_HALF);
     if (net.cable) {
-      for (const w of net.wires) tube(w, net.half ?? 7);
+      for (const w of net.wires) tube(w, net.half ?? CABLE_HALF);
     } else {
       // 照 wireGeometry：平頭線端，自由端切齊端點、接到別段（T 字、交叉）那端延長半個線寬；轉角畫圓弧
       ctx.strokeStyle = BASE_INK; ctx.lineWidth = 3; ctx.lineCap = 'butt';

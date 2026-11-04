@@ -13,9 +13,9 @@ for (const f of ['drawing', 'legacy', 'components', 'fixes', 'switches']) {
   if (fs.existsSync(file)) vm.runInNewContext(fs.readFileSync(file, 'utf8'), { window: win });
 }
 const img = loadImage(), W = img.width, H = img.height, old = analyze(img);
-const half = +(fs.readFileSync(path.join(PROJECT, 'js/app.js'), 'utf8').match(/const CABLE_HALF = (\d+)/) || [0, 7])[1];
+const half = require('../../js/drawing.js').CABLE_HALF;
 const drawing = win.WOLF_DRAWING, neu = rasterizeDrawing(drawing, { cableHalf: half });
-const { dropped, outlines } = netsToDrawing(old, { W, H, image: img, components: win.WOLF_COMPONENTS || [], fixes: win.WOLF_FIXES || {} });
+const { dropped, outlines, drawing: draft, roots } = netsToDrawing(old, { W, H, image: img, components: win.WOLF_COMPONENTS || [], fixes: win.WOLF_FIXES || {} });
 // 整批例外的線路不參與比對（它們的筆畫可能碰到別條線的點擊帶，被誤判成合併或部分沒畫到）
 // 標記筆畫：未標色、所有線段都在線色文字、單線接頭或多腳接頭範圍（外擴 4 px）內的舊線路（接頭的框邊、內框等），新圖改畫成標記
 const { strokeRects } = require('./marks');
@@ -31,6 +31,8 @@ const near4 = (lab, [x, y]) => { for (let r = 0; r <= 4; r++) for (let dy = -r; 
 // 例外的 pick 對到哪條舊線路：該點的線路，或某段中點距 pick ≤ 3 px 的線路（中段被電纜蓋過的殘段，label 查不到）
 const excOf = root => EXC.find(e => e.pick && (near(old.label, e.pick) === root ||
   old.segs.some(s => s.net === root && Math.abs(((s.x0 + s.x1) >> 1) - e.pick[0]) <= 3 && Math.abs(((s.y0 + s.y1) >> 1) - e.pick[1]) <= 3)));
+// 舊線路是否接地：同 draft.js 的推算（電纜標記、線色 G、未標線色但偏綠）
+const groundOf = new Set(roots.filter((r, i) => draft.nets[i].ground));
 const codeOf = new Map(); for (const s of old.segs) if (s.net >= 0 && s.netCode && !codeOf.has(s.net)) codeOf.set(s.net, s.netCode);
 const P = ([x, y]) => `(${x}, ${y})`;
 let allOk = true;
@@ -100,6 +102,9 @@ for (const [o, k] of m.map) {
   if (drop.has(o)) continue;
   const a = codeOf.get(o) ?? null, b = drawing.nets[k].code ?? null;
   if (a !== b) lines3.push({ ok: false, text: `新線路 ${k}：舊 ${a ?? 'null'}，新 ${b ?? 'null'}` });
+  // 接地：舊線路任一段標成接地，新線路的 ground 也要是 true（反之亦然）
+  const ga = groundOf.has(o), gb = !!drawing.nets[k].ground;
+  if (ga !== gb) lines3.push({ ok: false, text: `新線路 ${k}（${b ?? 'null'}）的接地：舊 ${ga}，新 ${gb}` });
 }
 report('線色一致', lines3);
 console.log(`線路網：舊 ${new Set(old.label.filter(k => k >= 0)).size} → 新 ${drawing.nets.length}`);
