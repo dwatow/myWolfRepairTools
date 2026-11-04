@@ -1,6 +1,6 @@
-// 目前這張圖的資料（STRIPS、COMPONENTS、ANCHORS、CABLES、DOTS、LINKS）在 init 依 DIAGRAM 載入 data/<id>/ 後才有值
+// 目前這張圖的資料（WOLF_DRAWING、COMPONENTS、ANCHORS）在 init 依 DIAGRAM 載入 data/<id>/ 後才有值
 // COMPONENTS 的元件位置：以圖寬 1800 為基準的 [x0, y0, x1, y1]，載入後依實際解析度換算
-let STRIPS, COMPONENTS = [], ANCHORS, CABLES, DOTS, LINKS, ERASE, INK, STATIC_AREAS = [];
+let COMPONENTS = [], ANCHORS, STATIC_AREAS = [];
 
 const COLORS = [
   { hex: '#e5322d', name: '紅' }, { hex: '#f08c00', name: '橘' }, { hex: '#e6c200', name: '黃' },
@@ -25,7 +25,7 @@ const $ = id => document.getElementById(id);
 const viewer = $('viewer'), canvas = $('view'), ctx = canvas.getContext('2d'), statusEl = $('status');
 let base, baseData, overlay, overlayCtx, groundLayer, selLayer = null, hoverLayer = null;
 const showCodes = () => $('show-codes').checked;
-let IW = 0, IH = 0, label, nets = [];             // nets[k] = { pixels, x0, y0, x1, y1, ground }
+let IW = 0, IH = 0, label, nets = [];             // nets[k] = { pixels, x0, y0, x1, y1, segs, code, ground }，k 是 drawing.nets 的順序
 let paint = {};                                    // paint[netIndex] = hex
 let selection = null;                              // { kind: 'net', k } | { kind: 'comp', i } | { kind: 'multi', ks }
 let saved = [];                                    // 已儲存的選取：{ name, savedAt, picks: [[x, y]] }（以線上一點的座標記錄，線路編號變動也找得回來）
@@ -35,36 +35,28 @@ let detail = { rects: [], key: '', drag: null }, detailLayer = null, detailPixel
 let hover = null, view = { s: 1, tx: 0, ty: 0 };
 const hideGround = () => $('hide-ground').checked;
 
-// ---- 載入圖片：7 條橫條上下拼接後逆時針轉 90°，讓文字變成正向 ----
+// ---- 載入資料：底圖與線路都由 data/<id>/drawing.js 產生 ----
 const loadImg = src => new Promise((ok, err) => { const i = new Image(); i.onload = () => ok(i); i.onerror = err; i.src = src; });
 const loadScript = src => new Promise((ok, err) => {
   const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => err(new Error('載入失敗 ' + src));
   document.body.append(s);
 });
+const OPTIONAL = ['/switches.js', '/legacy.js']; // 可省略的資料檔
 async function init() {
-  window.WOLF_SWITCHES = null;
-  for (const f of DATA_FILES) await loadScript(f).catch(e => { if (!f.endsWith('/switches.js')) throw e; }); // 開關表可省略
-  STRIPS = window.WOLF_STRIPS; COMPONENTS = window.WOLF_COMPONENTS; ANCHORS = window.WOLF_ANCHORS;
-  ({ cables: CABLES = [], dots: DOTS = [], links: LINKS = [], erase: ERASE = [], ink: INK = [], staticAreas: STATIC_AREAS = [] } = window.WOLF_FIXES || {});
-  const imgs = await Promise.all(STRIPS.map(loadImg));
-  const W0 = imgs[0].width, H0 = imgs.reduce((a, i) => a + i.height, 0);
-  IW = H0; IH = W0;
+  window.WOLF_SWITCHES = null; window.WOLF_LEGACY = null;
+  for (const f of DATA_FILES) await loadScript(f).catch(e => { if (!OPTIONAL.some(o => f.endsWith(o))) throw e; });
+  COMPONENTS = window.WOLF_COMPONENTS; ANCHORS = window.WOLF_ANCHORS;
+  ({ staticAreas: STATIC_AREAS = [] } = window.WOLF_FIXES || {});
+  const drawing = window.WOLF_DRAWING;
+  [IW, IH] = drawing.size;
   base = document.createElement('canvas'); base.width = IW; base.height = IH;
   const b = base.getContext('2d', { willReadFrequently: true });
-  b.translate(0, W0); b.rotate(-Math.PI / 2);
-  let y = 0; for (const i of imgs) { b.drawImage(i, 0, y); y += i.height; }
-  b.setTransform(1, 0, 0, 1, 0, 0);
-  await new Promise(r => setTimeout(r, 30)); // 讓「分析中」先畫出來
+  drawBase(b, drawing, COMPONENTS, IW / 1800);
+  await new Promise(r => setTimeout(r, 30)); // 讓「載入中」先畫出來
 
   baseData = b.getImageData(0, 0, IW, IH);
-  const r = analyzeNets(baseData, { anchors: ANCHORS, dots: DOTS, links: LINKS, erase: ERASE, ink: INK });
-  addCables(r);
-  // 固定區域與元件名稱文字（含底線）內的筆畫不算線路：點不到、不上色
-  const K = IW / 1800, labelAreas = COMPONENTS.filter(c => c.label).map(c => c.label.map(v => Math.round(v * K)));
-  for (const [x0, y0, x1, y1] of [...STATIC_AREAS, ...labelAreas])
-    for (let y = Math.max(0, y0); y <= Math.min(IH - 1, y1); y++) r.label.fill(-1, y * IW + Math.max(0, x0), y * IW + Math.min(IW - 1, x1) + 1);
-  buildNets(r);
-  buildComponents(r);
+  buildNets(drawing, rasterizeDrawing(drawing, { cableHalf: CABLE_HALF }));
+  buildComponents();
   buildGround();
 
   overlay = document.createElement('canvas'); overlay.width = IW; overlay.height = IH; overlayCtx = overlay.getContext('2d');
@@ -75,39 +67,15 @@ async function init() {
   select(null); // 開場不選任何東西
 }
 
-// 粗電纜當成獨立線路：把路徑範圍內的像素歸給它，並補上線段供元件連線判斷
-function addCables(r) {
-  CABLES.forEach((c, i) => {
-    const root = 10000000 + i;
-    for (let j = 1; j < c.path.length; j++) {
-      const [ax, ay] = c.path[j - 1], [bx, by] = c.path[j];
-      const x0 = Math.min(ax, bx), x1 = Math.max(ax, bx), y0 = Math.min(ay, by), y1 = Math.max(ay, by);
-      const hw = c.half ?? CABLE_HALF;
-      for (let y = y0 - hw; y <= y1 + hw; y++) for (let x = x0 - hw; x <= x1 + hw; x++)
-        if (x >= 0 && y >= 0 && x < IW && y < IH) r.label[y * IW + x] = root;
-      r.segs.push({ h: ay === by, x0, x1, y0, y1, net: root, netCode: c.code, ground: !!c.ground });
-    }
-  });
-}
-
-// 依像素把線路網分組，記下外框與平均顏色
-function buildNets(r) {
-  const count = new Map();
-  for (let i = 0; i < r.label.length; i++) if (r.label[i] >= 0) count.set(r.label[i], (count.get(r.label[i]) || 0) + 1);
-  const netOfRoot = new Map();
-  [...count.keys()].sort((a, c) => a - c).forEach((root, k) => {
-    netOfRoot.set(root, k);
-    nets.push({ pixels: new Int32Array(count.get(root)), n: 0, x0: IW, y0: IH, x1: 0, y1: 0, rgb: [0, 0, 0], segs: [], code: null });
-  });
+// 線路網：線芯像素（上色用）、外框、線段，以及資料裡的線色與接地
+function buildNets(drawing, r) {
   label = r.label;
-  const d = baseData.data;
-  for (let i = 0; i < label.length; i++) if (label[i] >= 0) {
-    const k = netOfRoot.get(label[i]), net = nets[k], x = i % IW, y = (i / IW) | 0;
-    net.pixels[net.n++] = i; label[i] = k;
-    net.rgb[0] += d[i * 4]; net.rgb[1] += d[i * 4 + 1]; net.rgb[2] += d[i * 4 + 2];
-    if (x < net.x0) net.x0 = x; if (x > net.x1) net.x1 = x; if (y < net.y0) net.y0 = y; if (y > net.y1) net.y1 = y;
-  }
-  for (const s of r.segs) if (s.net >= 0 && netOfRoot.has(s.net)) { const net = nets[netOfRoot.get(s.net)]; net.segs.push(s); net.code = s.netCode; }
+  nets = drawing.nets.map((d, k) => {
+    const pixels = r.cores[k], net = { pixels, n: pixels.length, x0: IW, y0: IH, x1: 0, y1: 0, segs: [], code: d.code ?? null, ground: !!d.ground };
+    for (const p of pixels) { const x = p % IW, y = (p / IW) | 0; if (x < net.x0) net.x0 = x; if (x > net.x1) net.x1 = x; if (y < net.y0) net.y0 = y; if (y > net.y1) net.y1 = y; }
+    return net;
+  });
+  for (const s of r.segs) nets[s.net].segs.push(s);
 }
 
 // 元件連到哪些線路：線段端點落在元件框內，而且線路有延伸到元件外面（排除元件符號自己的筆畫）
@@ -133,12 +101,8 @@ function buildComponents() {
   }
 }
 
-// 接地線：線色為 G；沒有標到線色的，看平均顏色是否偏綠（圖上 G 線畫成綠色）；再加上接到接地符號的線路
+// 接地線：資料的 ground 欄位（buildNets 已讀入），再加上接到接地符號的線路
 function buildGround() {
-  for (const net of nets) {
-    const [R, G, B] = net.rgb.map(v => v / net.pixels.length);
-    net.ground = net.segs.some(s => s.ground) || (net.code ? net.code === 'G' : G > R + 25 && G > B + 15);
-  }
   for (const c of COMPONENTS) if (c.ground) for (const k of c.nets) if (!nets[k].code || nets[k].code === 'G') nets[k].ground = true;
   groundLayer = document.createElement('canvas'); groundLayer.width = IW; groundLayer.height = IH;
   const g = groundLayer.getContext('2d'), img = g.createImageData(IW, IH);
