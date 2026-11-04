@@ -1,6 +1,6 @@
 // 塗色以座標儲存與舊資料轉移的檢查（headless Chrome、每個情境用全新的瀏覽器設定檔）：node tools/redraw/check-paint.js
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const { PROJECT } = require('../../.claude/skills/fixing-wire-nets/scripts/lib');
+const { PROJECT } = require('./lib');
 const { rasterizeDrawing } = require('../../js/drawing.js');
 const { evalInPage } = require('./chrome');
 

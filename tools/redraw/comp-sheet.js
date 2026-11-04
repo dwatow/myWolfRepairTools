@@ -2,7 +2,7 @@
 // 每個元件輸出一張 PNG：原圖（元件 box 外擴 20 px）放大，疊上墨水塊外框（紅）與編號（藍），
 // 墨水塊（不屬於導線的墨水，鄰近的字母併成一塊）座標寫到 $WORK/<圖>-comp-<序號>.json：[{ i, box: [x0, y0, x1, y1], parts }]
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const { PROJECT, WORK, DIAGRAM, loadImage } = require('../../.claude/skills/fixing-wire-nets/scripts/lib');
+const { PROJECT, WORK, DIAGRAM, loadImage } = require('./lib');
 const { rasterizeDrawing } = require('../../js/drawing.js');
 const { findMarks } = require('./marks');
 const { writePng, digits } = require('./png');

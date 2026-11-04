@@ -1,7 +1,7 @@
 // 待判讀標記的縮圖總表：DIAGRAM=<圖> node tools/redraw/review-sheet.js <輸出前綴> [種類…]
 // 讀 $WORK/<圖>-marks-review.json（環境變數 REVIEW 可指定別的檔），每格是原圖該標記外擴 30 px（紅框標出標記），每張 6×5 格，格子左上角寫序號（點陣數字）
 const fs = require('fs'), path = require('path');
-const { WORK, DIAGRAM, loadImage } = require('../../.claude/skills/fixing-wire-nets/scripts/lib');
+const { WORK, DIAGRAM, loadImage } = require('./lib');
 const [out, ...kinds] = process.argv.slice(2);
 const all = JSON.parse(fs.readFileSync(process.env.REVIEW || path.join(WORK, `${DIAGRAM}-marks-review.json`), 'utf8')).map((x, i) => ({ ...x, i }));
 const items = kinds.length ? all.filter(x => kinds.some(k => x.kind === k || x.reason.includes(k))) : all;

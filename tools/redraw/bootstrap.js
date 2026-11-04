@@ -2,7 +2,7 @@
 // drawing.js 已手改時要加 --force：線路網整份從影像重產（直接改在 drawing.js 的線路網會遺失），標記保留並重新切缺口
 // 用現有的影像辨識結果（js/nets.js＋data/<圖>/ 的 anchors、fixes、components）轉換，覆寫 data/<圖>/drawing.js
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const { PROJECT, DIAGRAM, loadImage, analyze } = require('../../.claude/skills/fixing-wire-nets/scripts/lib');
+const { PROJECT, DIAGRAM, loadImage, analyze } = require('./lib');
 const { netsToDrawing, tidyNet } = require('./draft');
 const { assertDraft, cutWires, dropMarkStrokes } = require('./marks');
 const { formatDrawing, headerOf, KEEP_FIELDS } = require('./write-drawing');

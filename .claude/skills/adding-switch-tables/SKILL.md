@@ -9,11 +9,11 @@ description: Use when adding or correcting the switch continuity tables (方向�
 開關表是**資料**，畫面由 `js/app.js` 的 `renderSwitches()` 統一產生。新增一張圖只要寫 `data/<圖>/switches.js`，不要改 `app.js`、`index.html`、`style.css`。
 
 ## 流程
-1. **找表格位置**：開關表通常在原圖左下角，線色對照表在右下角。用 `.claude/skills/fixing-wire-nets/scripts/crop.js`（在專案根目錄執行） 放大來看（環境變數 `DIAGRAM=<圖>`，第一次使用前照 fixing-wire-nets 的說明在 `$WORK` 安裝 `jpeg-js`）。例：`DIAGRAM=PA12C node .claude/skills/fixing-wire-nets/scripts/crop.js /tmp/t.png 900 2070 450 1`，看完再縮小半徑放大細看。PA12B 的開關表約在 x 400–2180、y 1950–2190（全解析度，圖寬 3323）。
+1. **找表格位置**：開關表通常在原圖左下角，線色對照表在右下角。用 `tools/redraw/crop.js`（在專案根目錄執行） 放大來看（環境變數 `DIAGRAM=<圖>`；原圖 `data/<圖>/strips.js` 只在本機，第一次使用前在 `$WORK`（預設 `$TMPDIR/wolf-nets`）執行 `npm i jpeg-js@0.4.4`）。例：`DIAGRAM=PA12C node tools/redraw/crop.js /tmp/t.png 900 2070 450 1`，看完再縮小半徑放大細看。PA12B 的開關表約在 x 400–2180、y 1950–2190（全解析度，圖寬 3323）。
 2. **逐張讀表**：表頭是接腳，每列是一個檔位；同一列兩個黑點之間連線，代表這兩支接腳導通。
 3. **寫資料**：`data/<圖>/switches.js`，格式如下。
 4. **對應接腳到線路**（`pins`，讓點檔位時圖上亮起導通的線）：開關元件在線路圖上的每支接腳都有標籤（如 `HO E LO HI TL R L W`），從接腳往外拉出的導線上取一點的座標。
-   - 找座標：用 fixing-wire-nets 的 `lib.js`（`loadImage`／`analyze`）列出端點落在接腳附近的垂直線段，印出 `x0, y0, y1, netCode`；再 crop 接腳標籤，確認接腳和線的對應順序。
+   - 找座標：用 `tools/redraw/lib.js`（`loadImage`／`analyze`）列出端點落在接腳附近的垂直線段，印出 `x0, y0, y1, netCode`；再 crop 接腳標籤，確認接腳和線的對應順序。
    - 取點：選在線段中段、離接腳圓圈幾 px 的地方（例：PA12B 底部接腳用 y=1745）。程式會在 ±4 px 內找最近的線路像素。
    - 同一支接腳可以出現在兩張表（例：燈光開關與起動開關共用 BAT2），座標相同。
 5. **驗收**：用 headless Chrome 開 `index.html?d=<圖>`。

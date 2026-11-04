@@ -1,7 +1,7 @@
 // 用 headless Chrome 載入 index.html：head 腳本插在 <head> 後、body 腳本插在 </body> 前，回傳頁面的 <title>
-// 同 .claude/skills/fixing-wire-nets/scripts/acceptance.js 的做法；fresh = true 時用全新的瀏覽器設定檔（localStorage 是空的）
+// 同 tools/redraw/acceptance.js 的做法；fresh = true 時用全新的瀏覽器設定檔（localStorage 是空的）
 const fs = require('fs'), path = require('path'), os = require('os'), { execFileSync } = require('child_process');
-const { PROJECT, WORK } = require('../../.claude/skills/fixing-wire-nets/scripts/lib');
+const { PROJECT, WORK } = require('./lib');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
 // 等頁面載入完成（#loading 隱藏）再執行 fn 的 body 腳本外殼；fn 的回傳值以 base64 JSON 寫進 title

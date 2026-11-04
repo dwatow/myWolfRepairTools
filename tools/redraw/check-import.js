@@ -1,6 +1,6 @@
 // 圈選細節淘汰後的匯入／載入檢查（headless Chrome、全新設定檔）：node tools/redraw/check-import.js
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const { PROJECT } = require('../../.claude/skills/fixing-wire-nets/scripts/lib');
+const { PROJECT } = require('./lib');
 const { evalInPage } = require('./chrome');
 
 const D = 'PA12B', win = {};

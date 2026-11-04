@@ -3,7 +3,7 @@
 // 哪張線路圖由環境變數 DIAGRAM 決定（預設 PA12B），各圖的資料在 data/<圖>/
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm');
 const { createRequire } = require('module');
-const PROJECT = path.resolve(__dirname, '../../../..');
+const PROJECT = path.resolve(__dirname, '../..');
 const WORK = process.env.WORK || path.join(os.tmpdir(), 'wolf-nets');
 const DIAGRAM = process.env.DIAGRAM || 'PA12B';
 const DATA = `data/${DIAGRAM}`;
@@ -16,7 +16,7 @@ function loadWindow(files, dir = PROJECT) {
   return win;
 }
 
-// 7 條橫條上下拼接後逆時針轉 90°（與 app.js init 相同），結果依圖快取在 WORK/<圖>[-<雜湊>].raw
+// 7 條橫條上下拼接後逆時針轉 90°（與 tools/redraw/sheet.js 相同），結果依圖快取在 WORK/<圖>[-<雜湊>].raw
 // 快取以 strips.js 的路徑、修改時間與大小為準：底圖改過就重新解碼
 // dir：讀哪個資料夾的 data/<圖>/strips.js（預設專案；比對改底圖前後時傳備份）
 // 原廠掃描圖不在 git 內（.gitignore），只有本機有原圖檔的人能跑比對原圖的工具；沒有時丟出說明
@@ -25,16 +25,16 @@ function originalFile(dir = PROJECT, diagram = DIAGRAM) {
   if (!fs.existsSync(file)) throw new Error(`找不到 data/${diagram}/strips.js（原廠掃描圖不在 git 內，比對原圖的工具需要本機的原圖檔）`);
   return file;
 }
-function loadImage(dir = PROJECT) {
-  const file = originalFile(dir), st = fs.statSync(file), stamp = `${file}:${st.mtimeMs}:${st.size}`;
-  const tag = dir === PROJECT ? DIAGRAM : `${DIAGRAM}-${require('crypto').createHash('md5').update(file).digest('hex').slice(0, 8)}`;
+function loadImage(dir = PROJECT, diagram = DIAGRAM) {
+  const file = originalFile(dir, diagram), st = fs.statSync(file), stamp = `${file}:${st.mtimeMs}:${st.size}`;
+  const tag = dir === PROJECT ? diagram : `${diagram}-${require('crypto').createHash('md5').update(file).digest('hex').slice(0, 8)}`;
   const raw = path.join(WORK, `${tag}.raw`), meta = path.join(WORK, `${tag}.json`);
   if (fs.existsSync(raw) && fs.existsSync(meta)) {
     const { IW, IH, stamp: s0 } = JSON.parse(fs.readFileSync(meta));
     if (s0 === stamp) return { data: new Uint8Array(fs.readFileSync(raw)), width: IW, height: IH };
   }
   const jpeg = createRequire(path.join(WORK, 'x.js'))('jpeg-js');
-  const imgs = loadWindow([`${DATA}/strips.js`], dir).WOLF_STRIPS.map(u => jpeg.decode(Buffer.from(u.split(',')[1], 'base64'), { useTArray: true }));
+  const imgs = loadWindow([`data/${diagram}/strips.js`], dir).WOLF_STRIPS.map(u => jpeg.decode(Buffer.from(u.split(',')[1], 'base64'), { useTArray: true }));
   const W0 = imgs[0].width, IW = imgs.reduce((a, i) => a + i.height, 0), IH = W0, data = new Uint8Array(IW * IH * 4);
   let off = 0;
   for (const im of imgs) {
