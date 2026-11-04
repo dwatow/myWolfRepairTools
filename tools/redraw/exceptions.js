@@ -12,7 +12,9 @@ const hvGround = [[1391, 1750], [1397, 1749]].map(pick => ({ pick, drop: true, r
 const cdiTab = { segment: [2004, 299], reason: 'CDI 4P 卡榫框左邊框被舊辨識併進 G 線路，改由元件圖元畫（2026-11-04 使用者要求導線與零件接合處切齊）' };
 // PA12C 缺油感應器方框內是空的（原廠 PDF 的 FUEL UNIT），中文底圖沿用 PA12B 油量計的可變電阻與滑臂筆畫，不畫（2026-11-04 使用者指出 PA12C 用缺油感應器）
 const fuelUnit = [[2730, 76], [2730, 128], [2714, 98], [2706, 122]].map(segment => ({ segment, reason: 'PA12C 缺油感應器方框內沒有可變電阻，不畫（2026-11-04 使用者指出）' }));
+// 頭燈內 G 線：原本從 x 124 往上接到燈絲上方，改成從兩組燈絲中間（x 123、y 868）往下接（2026-11-04 使用者要求導線直接接到燈絲）
+const headlightG = { segment: [123, 859], reason: '頭燈內 G 線改成直接接到兩組燈絲中間，原本往上繞的那段不畫（2026-11-04 使用者要求）' };
 module.exports = {
-  PA12B: [...outlines, cdiTab, ...fuseBattery, ...hvGround],
-  PA12C: [...outlines, cdiTab, ...fuseBattery, ...fuelUnit, ...hvGround],
+  PA12B: [...outlines, cdiTab, ...fuseBattery, ...hvGround, headlightG],
+  PA12C: [...outlines, cdiTab, ...fuseBattery, ...fuelUnit, ...hvGround, headlightG],
 };
