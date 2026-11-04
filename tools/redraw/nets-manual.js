@@ -12,6 +12,16 @@ function netAt(d, [x, y]) {
   return -1;
 }
 
+// 折線 w 的每一段都已在線路的導線上（同一條水平／垂直線、範圍涵蓋）：補過了（tidyNet 會把折線拆段，不能用整條相同判斷）
+function covered(net, w) {
+  const segs = net.wires.flatMap(x => x.slice(1).map((b, j) => [x[j], b]));
+  return w.slice(1).every((q, j) => {
+    const p = w[j];
+    return segs.some(([a, b]) => p[1] === q[1] ? a[1] === b[1] && a[1] === p[1] && Math.min(a[0], b[0]) <= Math.min(p[0], q[0]) && Math.max(a[0], b[0]) >= Math.max(p[0], q[0])
+      : a[0] === b[0] && a[0] === p[0] && Math.min(a[1], b[1]) <= Math.min(p[1], q[1]) && Math.max(a[1], b[1]) >= Math.max(p[1], q[1]));
+  });
+}
+
 function applyNetsManual(d, m = {}) {
   const log = [];
   for (const w of m.remove || []) for (const net of d.nets) {
@@ -20,7 +30,7 @@ function applyNetsManual(d, m = {}) {
   }
   for (const a of m.add || []) {
     const k = netAt(d, a.at); if (k < 0) throw new Error(`nets-manual add：${J(a.at)} 不在任何線路上`);
-    for (const w of a.wires) if (!d.nets[k].wires.some(x => J(x) === J(w))) { d.nets[k].wires.push(w); log.push(`補導線 ${J(w)} 到線路 ${k}（${d.nets[k].code}）`); }
+    for (const w of a.wires) if (!covered(d.nets[k], w)) { d.nets[k].wires.push(w); log.push(`補導線 ${J(w)} 到線路 ${k}（${d.nets[k].code}）`); }
   }
   for (const g of m.merge || []) {
     const a = netAt(d, g.at[0]), b = netAt(d, g.at[1]);

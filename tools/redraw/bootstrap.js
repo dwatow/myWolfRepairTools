@@ -3,7 +3,7 @@
 // 用現有的影像辨識結果（js/nets.js＋data/<圖>/ 的 anchors、fixes、components）轉換，覆寫 data/<圖>/drawing.js
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const { PROJECT, DIAGRAM, loadImage, analyze } = require('../../.claude/skills/fixing-wire-nets/scripts/lib');
-const { netsToDrawing } = require('./draft');
+const { netsToDrawing, tidyNet } = require('./draft');
 const { assertDraft, cutWires, dropMarkStrokes } = require('./marks');
 const { formatDrawing, headerOf, KEEP_FIELDS } = require('./write-drawing');
 const { applyNetsManual, MANUAL } = require('./nets-manual');
@@ -24,6 +24,7 @@ if (fs.existsSync(file)) {
   const win = {}; vm.runInNewContext(old, { window: win });
   for (const f of KEEP_FIELDS) drawing[f] = win.WOLF_DRAWING[f] || [];
   // 重產的線路網要和標記一致：文字、接頭處切缺口，接頭符號的筆畫移除（同 add-marks.js）
+  for (const net of drawing.nets) tidyNet(net);
   cutWires(drawing); dropMarkStrokes(drawing);
 }
 fs.writeFileSync(file, fs.existsSync(file) ? formatDrawing(drawing, headerOf(fs.readFileSync(file, 'utf8'))) : formatDrawing(drawing)); // 保留既有檔頭（含「已手改」標記）

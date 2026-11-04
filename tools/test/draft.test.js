@@ -85,3 +85,18 @@ test('nets-manual：移除、補線、合併', () => {
   applyNetsManual(d, { remove: [[[5, 0], [5, 9]]], add: [{ at: [40, 50], wires: [[[40, 50], [60, 50]]] }], merge: [{ at: [[20, 50], [60, 70]] }] });
   assert.equal(d.nets[1].wires.length, 2, '重複套用不會重複補線');
 });
+
+test('tidyNet：疊在一起的補線與線段整理成乾淨的轉角', () => {
+  const { tidyNet } = require('../redraw/draft.js');
+  const net = { code: 'G', wires: [[[340, 330], [1201, 330]], [[340, 363], [376, 363]], [[360, 330], [341, 330], [341, 362], [355, 362]]], dots: [] };
+  tidyNet(net);
+  const ws = net.wires.map(w => JSON.stringify(w)).sort();
+  assert.deepEqual(ws, ['[[341,330],[1201,330]]', '[[341,330],[341,363]]', '[[341,363],[376,363]]'].sort());
+});
+
+test('tidyNet：缺口大於 2 px 的同線段不合併（文字缺口保留）', () => {
+  const { tidyNet } = require('../redraw/draft.js');
+  const net = { code: 'B', wires: [[[0, 10], [40, 10]], [[60, 10], [90, 10]]], dots: [] };
+  tidyNet(net);
+  assert.equal(net.wires.length, 2);
+});
