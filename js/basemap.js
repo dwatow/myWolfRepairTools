@@ -109,10 +109,10 @@ function drawParts(ctx, parts, font) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(-Math.PI / 2); ctx.fillText(t, 0, 0); ctx.restore();
   };
   for (const p of parts) {
-    if (p.type === 'frame') { const [a, b, c, d] = p.box; ctx.save(); ctx.strokeStyle = BASE_BOX; ctx.lineWidth = 1.5; ctx.strokeRect(a, b, c - a, d - b); ctx.restore(); }
+    if (p.type === 'frame') { const [a, b, c, d] = p.box; ctx.save(); ctx.lineWidth = p.w || 2.5; ctx.strokeRect(a, b, c - a, d - b); ctx.restore(); }
     else if (p.type === 'text') text(p.text, p.at[0], p.at[1], p.size || 18, p.vertical, p.bold);
     else if (p.type === 'pin') {
-      const [x, y] = p.at, r = 7;
+      const [x, y] = p.at, r = 10; // 同原圖接腳圓圈
       ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.save(); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.restore(); ctx.stroke();
       // 名稱預設在圓圈上方；textAt 可指定位置
       ctx.font = `bold 20px ${font}`; const len = ctx.measureText(p.name).width;
@@ -123,6 +123,7 @@ function drawParts(ctx, parts, font) {
       ctx.save(); ctx.fillStyle = '#ffffff'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0); ctx.restore(); ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
       if (p.label) { ctx.font = `16px ${font}`; const vert = ctx.measureText(p.label).width + 6 > x1 - x0; text(p.label, (x0 + x1) / 2, (y0 + y1) / 2, 16, vert); }
     } else if (p.type === 'symbol') { ctx.save(); drawSymbol(ctx, p, font); ctx.restore(); }
+    else if (SHAPES[p.type]) { ctx.save(); if (p.w) ctx.lineWidth = p.w; SHAPES[p.type](ctx, p); ctx.restore(); }
   }
   ctx.restore();
 }
@@ -220,3 +221,45 @@ function drawSymbol(ctx, p, font) {
     }
   }
 }
+
+// 照原圖近似的基本圖形（座標為全解析度；w 覆寫線寬，預設 2.5）
+//   line { pts, close?, fill? }：折線；fill: true 實心
+//   rect { box, fill? }、circle { c, r, fill? }、ellipse { c, rx, ry, a0?, a1? }（a0／a1 為角度，畫圓弧；0° 朝右、順時針）
+//   loops { from, to, n, h, side? }：沿 from→to 的線圈環圈（擺線），n 圈、環圈高 h；起點在環圈那一側，side = -1 時整個翻到另一側
+//   hatch { pts, gap? }：多邊形外框＋斜線填充（火星塞箭頭）
+const SHAPES = {
+  line(ctx, p) {
+    ctx.beginPath(); p.pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+    if (p.close || p.fill) ctx.closePath();
+    if (p.fill) ctx.fill(); else ctx.stroke();
+  },
+  rect(ctx, p) { const [a, b, c, d] = p.box; if (p.fill) ctx.fillRect(a, b, c - a, d - b); else ctx.strokeRect(a, b, c - a, d - b); },
+  circle(ctx, p) { ctx.beginPath(); ctx.arc(p.c[0], p.c[1], p.r, 0, 2 * Math.PI); if (p.fill) ctx.fill(); else ctx.stroke(); },
+  ellipse(ctx, p) {
+    const rad = d => d * Math.PI / 180;
+    ctx.beginPath(); ctx.ellipse(p.c[0], p.c[1], p.rx, p.ry ?? p.rx, 0, rad(p.a0 ?? 0), rad(p.a1 ?? 360)); ctx.stroke();
+  },
+  loops(ctx, p) {
+    // 長幅擺線：u = a·t − b·sin t、v = −b·cos t（b > a 時出現環圈），t 從 0 到 2πn，沿線方向總長 = 2πn·a
+    // from→to 連線是線圈的底邊；環圈在左側（水平向右時在上方），高 h，同原圖的燈絲、線圈
+    const [ax, ay] = p.from, [bx, by] = p.to, L = Math.hypot(bx - ax, by - ay), ang = Math.atan2(by - ay, bx - ax);
+    const n = p.n, a = L / (2 * Math.PI * n), b = Math.max(p.h / 2, a * 1.05), side = p.side || 1, steps = 60 * n;
+    ctx.save(); ctx.translate(ax, ay); ctx.rotate(ang); ctx.beginPath();
+    // 從 t = π 開始到 π + 2πn：起點、終點都在連接弧的最低點（沿線速度最快，曲線不會超出兩端），環圈 n 個
+    const ph = Math.PI, u0 = a * ph - b * Math.sin(ph);
+    for (let i = 0; i <= steps; i++) {
+      const t = ph + 2 * Math.PI * n * i / steps, u = a * t - b * Math.sin(t) - u0, v = side * -b * (Math.cos(t) + 1); // from→to 連線在線圈底部，環圈往上高 2b
+      i ? ctx.lineTo(u, v) : ctx.moveTo(u, v);
+    }
+    ctx.stroke(); ctx.restore();
+  },
+  hatch(ctx, p) {
+    // 路徑不在 save/restore 的狀態內：裁切用一次、最後描外框再建一次
+    const poly = () => { ctx.beginPath(); p.pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); };
+    poly(); ctx.save(); ctx.clip();
+    const xs = p.pts.map(q => q[0]), ys = p.pts.map(q => q[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), g = p.gap || 6;
+    ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let k = x0 - (y1 - y0); k <= x1; k += g) { ctx.moveTo(k, y1); ctx.lineTo(k + (y1 - y0), y0); }
+    ctx.stroke(); ctx.restore(); poly(); ctx.stroke();
+  },
+};
