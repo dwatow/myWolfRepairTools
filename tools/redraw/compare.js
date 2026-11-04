@@ -17,7 +17,12 @@ const half = +(fs.readFileSync(path.join(PROJECT, 'js/app.js'), 'utf8').match(/c
 const drawing = win.WOLF_DRAWING, neu = rasterizeDrawing(drawing, { cableHalf: half });
 const { dropped, outlines } = netsToDrawing(old, { W, H, image: img, components: win.WOLF_COMPONENTS || [], fixes: win.WOLF_FIXES || {} });
 // 整批例外的線路不參與比對（它們的筆畫可能碰到別條線的點擊帶，被誤判成合併或部分沒畫到）
-const batchSet = new Set([...dropped, ...outlines]);
+// 標記筆畫：未標色、所有線段都在線色文字、單線接頭或多腳接頭範圍（外擴 4 px）內的舊線路（接頭的框邊、內框等），新圖改畫成標記
+const { strokeRects } = require('./marks');
+const mRects = strokeRects(drawing);
+const segsOf = new Map(); for (const s of old.segs) if (s.net >= 0) { if (!segsOf.has(s.net)) segsOf.set(s.net, []); segsOf.get(s.net).push(s); }
+const markStrokes = [...segsOf].filter(([k, ss]) => !ss.some(s => s.netCode) && ss.every(s => mRects.some(([a, b, c, d]) => s.x0 >= a && s.x1 <= c && s.y0 >= b && s.y1 <= d))).map(([k]) => k);
+const batchSet = new Set([...dropped, ...outlines, ...markStrokes]);
 const m = matchNets({ oldSegs: old.segs.filter(s => !batchSet.has(s.net)), oldLabel: old.label, newLabel: neu.label, W });
 const at = (lab, [x, y]) => lab[y * W + x];
 const near = (lab, [x, y]) => { for (let d = 0; d <= 2; d++) for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) { const k = lab[(y + dy) * W + x + dx]; if (k >= 0) return k; } return -1; };
@@ -40,6 +45,7 @@ const report = (name, lines) => {
 const drop = new Set(dropped), outSet = new Set(outlines), lines1 = [];
 const item = (root, text) => { const e = excOf(root); return { ok: !!e, text: e ? `${text}（已確認例外：${e.reason}）` : text }; };
 lines1.push({ ok: true, text: `整批例外（整條在元件框內的符號、文字筆畫）：${dropped.length} 條` });
+lines1.push({ ok: true, text: `標記筆畫（整條在線色文字或單線接頭範圍內，改畫成標記，含接頭外框內）：${markStrokes.filter(k => !drop.has(k)).length} 條` });
 for (const o of outlines) { const s = old.segs.find(s => s.net === o); lines1.push(item(o, `電纜外框殘段（不畫）：舊線路 未標色 ${P([(s.x0 + s.x1) >> 1, (s.y0 + s.y1) >> 1])}`)); }
 for (const x of m.missing) lines1.push(item(x.old, `沒畫到：舊線路 ${codeOf.get(x.old) || '未標色'} ${P(x.at)}`));
 for (const x of m.splits) lines1.push(item(x.old, `一分為二：舊線路 ${codeOf.get(x.old) || '未標色'} → 新 ${x.news.join('、')}，${x.at.map(P).join('、')}`));
@@ -48,6 +54,8 @@ for (const x of m.merges) {
   lines1.push({ ok: olds.every(excOf), text: `併成一條：新 ${x.news} ← 舊 ${olds.map(o => codeOf.get(o) || '未標色').join(' + ')} ${P(x.at)}` + (olds.every(excOf) ? `（已確認例外：${excOf(olds[0]).reason}）` : '') });
 }
 const partialBy = new Map(); for (const x of m.partial) if (!partialBy.has(x.old)) partialBy.set(x.old, x);
+// 段落中點在標記範圍內的（文字與接頭之間的短線，切缺口時一併切掉，同原圖）不算部分沒畫到
+for (const [k, x] of [...partialBy]) if (mRects.some(([a, b, c, d]) => x.at[0] >= a && x.at[0] <= c && x.at[1] >= b && x.at[1] <= d)) partialBy.delete(k);
 for (const x of partialBy.values()) lines1.push(item(x.old, `部分線段沒畫到：舊線路 ${codeOf.get(x.old) || '未標色'} ${P(x.at)}（共 ${m.partial.filter(p => p.old === x.old).length} 段）`));
 report('接線一致', lines1);
 
@@ -72,7 +80,7 @@ if (L) {
     if (p === null) { onDropped++; return; } // 已標成不轉移（線在新圖不存在）
     const root = near(old.label, p);
     // 新圖不畫的舊線路，座標必須是 null，否則轉移時可能塗到剛好經過該點的別條線
-    if (drop.has(root) || outSet.has(root)) { if (near(neu.label, p) >= 0) { leak++; lines2.push({ ok: false, text: `舊線路 ${k} 是不畫的筆畫，但座標 ${P(p)} 落在新線路 ${near(neu.label, p)} 上（legacy.js 應為 null）` }); } else onDropped++; return; }
+    if (drop.has(root) || outSet.has(root) || markStrokes.includes(root)) { if (near(neu.label, p) >= 0) { leak++; lines2.push({ ok: false, text: `舊線路 ${k} 是不畫的筆畫，但座標 ${P(p)} 落在新線路 ${near(neu.label, p)} 上（legacy.js 應為 null）` }); } else onDropped++; return; }
     const want = m.map.get(root), got = near(neu.label, p);
     if (want !== undefined && want === got) okN++;
     else lines2.push({ ok: false, text: `舊線路 ${k} 的塗色座標 ${P(p)}：應落在新 ${want ?? '（無對應）'}，實際 ${got}` });

@@ -131,4 +131,66 @@ function assertDraft(text, force) {
   if (!force && /^\/\/ 已手改/.test(text)) throw new Error('drawing.js 已手改，產生工具不會覆寫；確定要重產請加 --force');
 }
 
-module.exports = { findMarks, classify, attach, assertDraft };
+// 文字與單線接頭所在的導線切開留缺口（同原圖；舊辨識把字母的橫筆畫連進了線段）
+// 文字大小以 basemap.js 的粗體 21px 估計：每字 14 px、「/」7 px，高 16，沿線方向兩側再留 CUT_PAD；
+// plug 30×22、socket 45×21 不留白（同原圖，導線直接接到接頭邊緣）。markRects 回傳 [x0, y0, x1, y1, 留白]
+const CUT_PAD = 6, MIN_PIECE = 6;
+function markRects(d) {
+  const rects = [];
+  for (const l of d.labels || []) {
+    const w = [...l.text].reduce((a, ch) => a + (ch === '/' ? 7 : 14), 0), h = 16;
+    const [hw, hh] = l.vertical ? [h / 2, w / 2] : [w / 2, h / 2];
+    rects.push([...[l.at[0] - hw, l.at[1] - hh, l.at[0] + hw, l.at[1] + hh].map(Math.round), CUT_PAD]);
+  }
+  for (const m of d.inline || []) {
+    const [len, wid] = m.kind === 'plug' ? [30, 22] : [45, 21], [hw, hh] = m.dir === 'v' ? [wid / 2, len / 2] : [len / 2, wid / 2];
+    rects.push([...[m.at[0] - hw, m.at[1] - hh, m.at[0] + hw, m.at[1] + hh].map(Math.round), 0]);
+  }
+  return rects;
+}
+function cutWires(d) {
+  const rects = markRects(d);
+  for (const net of d.nets) {
+    if (net.cable) continue;
+    const out = [];
+    for (const wire of net.wires) {
+      const segs = wire.slice(1).map((b, j) => [wire[j], b]);
+      const hit = segs.some(([a, b]) => rects.some(r => crosses(a, b, r)));
+      if (!hit) { out.push(wire); continue; }
+      for (const [a, b] of segs) {
+        const h = a[1] === b[1], c = h ? a[1] : a[0];
+        let pieces = [[Math.min(h ? a[0] : a[1], h ? b[0] : b[1]), Math.max(h ? a[0] : a[1], h ? b[0] : b[1])]];
+        for (const r of rects) {
+          const [lo, hi, c0, c1] = h ? [r[0], r[2], r[1], r[3]] : [r[1], r[3], r[0], r[2]];
+          if (c < c0 || c > c1) continue;
+          const pad = r[4];
+          pieces = pieces.flatMap(([p, q]) => q < lo - pad || p > hi + pad ? [[p, q]] : [[p, lo - pad - 1], [hi + pad + 1, q]].filter(([u, v]) => v >= u));
+        }
+        for (const [p, q] of pieces) if (q - p >= MIN_PIECE) out.push(h ? [[p, c], [q, c]] : [[c, p], [c, q]]);
+      }
+    }
+    net.wires = out;
+  }
+  return d;
+}
+// 線段 a→b 沿著自己的方向穿過矩形 r（中心線落在矩形的橫向範圍內）
+function crosses(a, b, r) {
+  const h = a[1] === b[1];
+  if (h) return a[1] >= r[1] && a[1] <= r[3] && Math.max(a[0], b[0]) >= r[0] && Math.min(a[0], b[0]) <= r[2];
+  return a[0] >= r[0] && a[0] <= r[2] && Math.max(a[1], b[1]) >= r[1] && Math.min(a[1], b[1]) <= r[3];
+}
+
+// 未標色、所有折線點都在標記或接頭外框（外擴 STROKE_PAD）內的線路：是接頭符號的筆畫，不是導線，從 nets 移除；沒有導線的未標色線路也移除。回傳移除幾條
+const STROKE_PAD = 4;
+function strokeRects(d) {
+  return [...markRects(d).map(r => r.slice(0, 4)), ...(d.connectors || []).map(c => c.box)].map(([a, b, c, e]) => [a - STROKE_PAD, b - STROKE_PAD, c + STROKE_PAD, e + STROKE_PAD]);
+}
+function dropMarkStrokes(d) {
+  const rects = strokeRects(d), n0 = d.nets.length;
+  const inside = ([x, y]) => rects.some(([a, b, c, e]) => x >= a && x <= c && y >= b && y <= e);
+  // 切缺口後一段都不剩的（文字、接頭之間的短線）也移除
+  d.nets = d.nets.filter(n => n.code !== null || n.cable || !(!n.wires.length || n.wires.every(w => w.every(inside))));
+  return n0 - d.nets.length;
+}
+
+module.exports = { findMarks, classify, attach, assertDraft, cutWires, markRects, strokeRects, dropMarkStrokes };

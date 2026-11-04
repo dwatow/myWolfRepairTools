@@ -4,7 +4,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const { PROJECT, DIAGRAM, loadImage, analyze } = require('../../.claude/skills/fixing-wire-nets/scripts/lib');
 const { netsToDrawing } = require('./draft');
 const { assertDraft } = require('./marks');
-const { formatDrawing } = require('./write-drawing');
+const { formatDrawing, headerOf } = require('./write-drawing');
 
 const load = f => { const c = { window: {} }; vm.runInNewContext(fs.readFileSync(path.join(PROJECT, 'data', DIAGRAM, f), 'utf8'), c); return c.window; };
 const img = loadImage(), r = analyze(img);
@@ -20,7 +20,7 @@ if (fs.existsSync(file)) {
   const win = {}; vm.runInNewContext(old, { window: win });
   for (const f of ['connectors', 'inline', 'labels', 'texts']) drawing[f] = win.WOLF_DRAWING[f] || [];
 }
-fs.writeFileSync(file, formatDrawing(drawing));
+fs.writeFileSync(file, fs.existsSync(file) ? formatDrawing(drawing, headerOf(fs.readFileSync(file, 'utf8'))) : formatDrawing(drawing)); // 保留既有檔頭（含「已手改」標記）
 const dots = drawing.nets.reduce((a, n) => a + n.dots.length, 0);
 console.log(`${DIAGRAM}：線路網 ${drawing.nets.length} 條；整批例外 ${dropped.length} 條；圓點 ${dots} 個`);
 
