@@ -20,4 +20,6 @@ ${[...list('nets', d.nets, true), ...['connectors', 'inline', 'labels', 'texts',
 const headerOf = text => text.slice(0, text.indexOf('window.WOLF_DRAWING')).trimEnd();
 // 只替換 parts（元件內的圖元，tools/redraw/add-parts.js 擁有這個欄位），其他欄位不動
 const applyParts = (d, parts) => Object.assign(d, { parts });
-module.exports = { formatDrawing, headerOf, HEADER, applyParts };
+// 線路網以外、由人工判讀產生的欄位：bootstrap.js 重產線路網時原樣保留
+const KEEP_FIELDS = ['connectors', 'inline', 'labels', 'texts', 'parts'];
+module.exports = { formatDrawing, headerOf, HEADER, applyParts, KEEP_FIELDS };

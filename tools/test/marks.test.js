@@ -163,3 +163,9 @@ test('只改寫 parts', () => {
   const out = formatDrawing(d);
   assert.match(out, /\n  parts: \[\n    \{"type":"text","text":"a","at":\[1,2\]\},\n    \{"type":"frame"/);
 });
+
+test('bootstrap 重產線路網時保留的欄位含 parts', () => {
+  const { KEEP_FIELDS } = require('../redraw/write-drawing.js');
+  assert.deepEqual(KEEP_FIELDS, ['connectors', 'inline', 'labels', 'texts', 'parts']);
+  assert.match(require('fs').readFileSync(require('path').join(__dirname, '../redraw/bootstrap.js'), 'utf8'), /for \(const f of KEEP_FIELDS\)/);
+});

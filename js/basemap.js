@@ -27,8 +27,8 @@ function drawBase(ctx, drawing, components, K) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const c of components) {
     const [a, b, cc, d] = c.box.map(v => v * K);
-    // 有 parts 時外框由 parts 的 frame 決定（原圖有外框才畫）；舊資料沒有 parts 就照舊畫元件方框
-    if (!drawing.parts) { ctx.strokeStyle = BASE_BOX; ctx.lineWidth = 1.5; ctx.strokeRect(a, b, cc - a, d - b); }
+    // 有 parts 時外框由 parts 的 frame 決定（原圖有外框才畫）；沒有 parts（或是空的）就照舊畫元件方框
+    if (!drawing.parts?.length) { ctx.strokeStyle = BASE_BOX; ctx.lineWidth = 1.5; ctx.strokeRect(a, b, cc - a, d - b); }
     const [x0, y0, x1, y1] = c.label ? c.label.map(v => v * K) : [a + 4, b + 4, cc - 4, b + 26];
     // 名稱範圍可能含規格那一行（原圖名稱下方的「(12V 10W)」），名稱字級上限 24、靠範圍上緣
     // 名稱結尾的全形括號是 components.js 用來區分同名元件的（例：接地（引擎）），原圖沒有，不畫
