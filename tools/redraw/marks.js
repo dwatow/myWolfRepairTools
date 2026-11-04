@@ -149,8 +149,7 @@ function markRects(d) {
     rects.push([...[m.at[0] - hw, m.at[1] - hh, m.at[0] + hw, m.at[1] + hh].map(Math.round), 0]);
   }
   // 多腳接頭方框（導線上的與元件上的）：框內的導線切掉，導線停在框邊線上（留白 −1 = 切到框邊為止）
-  // through: true 的接頭（框內有導線穿過，例：喇叭旁兩支 B 腳在框內併成一條）不切
-  for (const c of [...(d.connectors || []), ...(d.parts || []).filter(p => p.type === 'connector')]) if (!c.through) rects.push([...c.box, -1]);
+  for (const c of [...(d.connectors || []), ...(d.parts || []).filter(p => p.type === 'connector')]) rects.push([...c.box, -1]);
   return rects;
 }
 function cutWires(d) {
