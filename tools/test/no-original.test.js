@@ -23,3 +23,11 @@ test('沒有檔案引用舊 skill 的腳本', () => {
   const bad = files.filter(f => fs.existsSync(path.join(root, f)) && /fixing-wire-nets\/scripts|editing-diagram-image\/scripts/.test(read(f)));
   assert.deepEqual(bad, []);
 });
+
+test('CLAUDE.md 寫明比對工具的前置條件', () => {
+  const md = read('CLAUDE.md'), lib = read('tools/redraw/lib.js');
+  const ver = (lib.match(/npm i (jpeg-js@[\d.]+)/) || [])[1];
+  assert.ok(ver, 'lib.js 註解要寫 jpeg-js 版本');
+  assert.ok(md.includes(`npm i ${ver}`), `CLAUDE.md 要寫 npm i ${ver}`);
+  assert.ok(md.includes('沒有本機原圖'), 'CLAUDE.md 要寫沒有本機原圖時怎麼辦');
+});
