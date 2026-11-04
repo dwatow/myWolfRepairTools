@@ -74,14 +74,25 @@ function drawMarks(ctx, drawing, font) {
     ctx.font = `bold ${MARK.text}px ${font}`;
     if (l.vertical) vText(l.text, l.at[0], l.at[1]); else ctx.fillText(l.text, l.at[0], l.at[1]);
   }
+  // 三角形公端緊接著母端（同一條線、尖端朝向母端、空隙 ≤ 6 px）時，尖端拉到母端外框上，兩者貼齊（同原圖）
+  const tipReach = m => {
+    const ax = m.dir === 'v' ? 1 : 0, sgn = m.flip ? -1 : 1;
+    let best = MARK.plugLen / 2;
+    for (const s of drawing.inline || []) {
+      if (s.kind !== 'socket' || s.dir !== m.dir || Math.abs(s.at[1 - ax] - m.at[1 - ax]) > 3) continue;
+      const reach = (s.at[ax] - m.at[ax]) * sgn - MARK.sockW / 2, gap = reach - MARK.plugLen / 2;
+      if (gap > 0 && gap <= 6) best = reach;
+    }
+    return best;
+  };
   for (const m of drawing.inline || []) {
     ctx.save(); ctx.translate(m.at[0] + 0.5, m.at[1] + 0.5);
     if (m.dir === 'v') ctx.rotate(Math.PI / 2);
     if (m.flip) ctx.scale(-1, 1);
     if (m.kind === 'plug') {
-      const L = MARK.plugLen / 2, B = MARK.plugBase / 2;
+      const L = MARK.plugLen / 2, B = MARK.plugBase / 2, T = tipReach(m); // T：尖端位置（底邊固定在 −L）
       ctx.fillStyle = '#ffffff'; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.moveTo(-L, -B); ctx.lineTo(L, 0); ctx.lineTo(-L, B); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-L, -B); ctx.lineTo(T, 0); ctx.lineTo(-L, B); ctx.closePath(); ctx.fill(); ctx.stroke();
     } else {
       const w = MARK.sockW / 2, h = MARK.sockH / 2;
       ctx.fillStyle = '#ffffff'; ctx.lineWidth = 2;

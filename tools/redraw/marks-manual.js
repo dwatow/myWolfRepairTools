@@ -25,6 +25,8 @@ const SHARED = {
     { kind: 'plug', at: [443, 1361], dir: 'h' }, { kind: 'plug', at: [443, 1380], dir: 'h' },
     { kind: 'plug', at: [2921, 1140], dir: 'h' }, { kind: 'plug', at: [2997, 1160], dir: 'h', flip: true },
     { kind: 'plug', at: [1472, 627], dir: 'h' }, { kind: 'socket', at: [1510, 627], dir: 'h' }, // GR 線：文字與接頭併成一塊
+    // G/R、G/Y：三角形左側的短導線被併進接頭，三角形被推到左邊 11 px；照原圖改到 1458～1488（尖端貼著母端）
+    { kind: 'plug', at: [1473, 403], dir: 'h' }, { kind: 'plug', at: [1473, 444], dir: 'h' },
   ],
   // 自動結果中要移除的線色文字（at 相距 ≤ 3 px 視為同一筆）
   removeLabels: [
