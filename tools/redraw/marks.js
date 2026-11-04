@@ -187,9 +187,11 @@ function strokeRects(d) {
 }
 function dropMarkStrokes(d) {
   const rects = strokeRects(d), n0 = d.nets.length;
-  const inside = ([x, y]) => rects.some(([a, b, c, e]) => x >= a && x <= c && y >= b && y <= e);
+  // 每一段都要整段落在同一個框內（同 compare.js 的標記筆畫判斷），兩端各在一個框、中段在外的不算
+  const segIn = (p, q) => rects.some(([a, b, c, e]) => Math.min(p[0], q[0]) >= a && Math.max(p[0], q[0]) <= c && Math.min(p[1], q[1]) >= b && Math.max(p[1], q[1]) <= e);
+  const wireIn = w => w.length === 1 ? segIn(w[0], w[0]) : w.slice(1).every((q, j) => segIn(w[j], q));
   // 切缺口後一段都不剩的（文字、接頭之間的短線）也移除
-  d.nets = d.nets.filter(n => n.code !== null || n.cable || !(!n.wires.length || n.wires.every(w => w.every(inside))));
+  d.nets = d.nets.filter(n => n.code !== null || n.cable || !(!n.wires.length || n.wires.every(wireIn)));
   return n0 - d.nets.length;
 }
 

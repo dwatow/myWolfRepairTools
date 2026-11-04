@@ -146,3 +146,10 @@ test('切缺口後沒有導線的未標色線路移除', () => {
   assert.equal(dropMarkStrokes(d), 1);
   assert.deepEqual(d.nets.map(n => n.code), ['B']);
 });
+
+test('兩端各在不同框內、中段在框外的未標色導線不移除', () => {
+  const { dropMarkStrokes } = require('../redraw/marks.js');
+  const d = { size: [W, H], nets: [{ code: null, wires: [[[20, 50], [180, 50]]] }],
+    connectors: [{ label: '', box: [10, 40, 30, 60] }, { label: '', box: [170, 40, 190, 60] }], labels: [], inline: [] };
+  assert.equal(dropMarkStrokes(d), 0);
+});

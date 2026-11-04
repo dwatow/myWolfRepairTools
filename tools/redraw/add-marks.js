@@ -1,4 +1,5 @@
 // 產生標記草稿：DIAGRAM=<圖> node tools/redraw/add-marks.js [--force]
+// drawing.js 已手改時要加 --force：標記整份重建（只保留 marks-manual.js 的人工判讀，直接改在 drawing.js 的標記會遺失）
 // 從原圖找出導線上的線色文字、單線接頭、多腳接頭，改寫 data/<圖>/drawing.js 的 connectors／inline／labels／texts（nets 不動）
 // 無法自動判定的寫到 $WORK/<圖>-marks-review.json，由人工看原圖補上
 const fs = require('fs'), path = require('path'), vm = require('vm');
