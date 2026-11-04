@@ -30,9 +30,6 @@ let IW = 0, IH = 0, label, nets = [];             // nets[k] = { pixels, x0, y0,
 let paint = {};                                    // paint[netIndex] = hex（存檔時轉成座標）
 let selection = null;                              // { kind: 'net', k } | { kind: 'comp', i } | { kind: 'multi', ks }
 let saved = [];                                    // 已儲存的選取：{ name, savedAt, picks: [[x, y]] }（以線上一點的座標記錄，線路編號變動也找得回來）
-                                                   // 細節：{ name, kind: 'detail', savedAt, rects: [[x0, y0, x1, y1]], pixels: [[x, y]] }，與同名的選取成對
-// 圈選細節：在選取的線上框出有問題的筆畫；rects 跟著選取的線走，換選別的線就清空
-let detail = { rects: [], key: '', drag: null }, detailLayer = null, detailPixels = [];
 let hover = null, view = { s: 1, tx: 0, ty: 0 };
 const hideGround = () => $('hide-ground').checked;
 
@@ -64,6 +61,7 @@ async function init() {
   const paintNote = loadPaint();
   $('loading').hidden = true;
   try { saved = JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); } catch {}
+  if (saved.some(isDetail)) { saved = saved.filter(e => !isDetail(e)); storeSaved(); } // 舊版的細節項目：功能已淘汰
   renderComps(); renderLegend(); renderSwitches(); rebuildOverlay(); fit(); renderList(); renderSaved();
   select(null); // 開場不選任何東西
   if (paintNote) statusEl.textContent = paintNote;
@@ -158,44 +156,6 @@ function thickLayer(ks, r) {
   return { c, x: x0, y: y0 };
 }
 
-// ---- 圈選細節 ----
-const normRect = ({ x0, y0, x1, y1 }) => {
-  const c = (v, m) => Math.min(m - 1, Math.max(0, Math.round(v)));
-  return [c(Math.min(x0, x1), IW), c(Math.min(y0, y1), IH), c(Math.max(x0, x1), IW), c(Math.max(y0, y1), IH)];
-};
-// 選取的線落在任一框內的像素＝待修改的線段，畫成原本顯示顏色的反色
-function rebuildDetail() {
-  detailPixels = []; detailLayer = null;
-  const ks = selectedNets(selection), rects = detail.rects;
-  if (rects.length && ks.length) {
-    const inside = (x, y) => rects.some(r => x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3]);
-    const hits = [];
-    for (const k of ks) { const f = netFill(k);
-      for (const p of nets[k].pixels) { const x = p % IW, y = (p / IW) | 0;
-        if (inside(x, y)) { detailPixels.push([x, y]); hits.push([x, y, (typeof f === 'function' ? f(x, y) : f) || [70, 76, 82]]); } } }
-    if (hits.length) {
-      const r = THIN + 1;
-      let x0 = IW, y0 = IH, x1 = 0, y1 = 0;
-      for (const [x, y] of hits) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
-      x0 -= r; y0 -= r; const w = x1 - x0 + r + 1, h = y1 - y0 + r + 1;
-      const c = document.createElement('canvas'); c.width = w; c.height = h;
-      const g = c.getContext('2d'), img = g.createImageData(w, h), d = img.data;
-      for (const [x, y, col] of hits) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
-        const q = ((y - y0 + dy) * w + x - x0 + dx) * 4;
-        d[q] = 255 - col[0]; d[q + 1] = 255 - col[1]; d[q + 2] = 255 - col[2]; d[q + 3] = 255;
-      }
-      g.putImageData(img, 0, 0); detailLayer = { c, x: x0, y: y0 };
-    }
-  }
-  const has = ks.length > 0;
-  $('detail-mode').disabled = !has; if (!has) $('detail-mode').checked = false;
-  $('detail-undo').disabled = $('detail-clear').disabled = !rects.length;
-}
-const detailMode = () => $('detail-mode').checked && selectedNets(selection).length > 0;
-$('detail-mode').onchange = () => { rebuildDetail(); saveMsg($('detail-mode').checked ? '在圖上拖曳畫框，框住有問題的線段；可畫多框（此時拖曳不會平移，滾輪仍可縮放）' : ''); };
-$('detail-undo').onclick = () => { detail.rects.pop(); rebuildDetail(); updateSaveButtons(); draw(); };
-$('detail-clear').onclick = () => { detail.rects = []; rebuildDetail(); updateSaveButtons(); draw(); };
-
 function rebuildOverlay() {
   const img = overlayCtx.createImageData(IW, IH);
   drawNets(img, 0, 0, IW, visibleNets(nets.map((_, k) => k)), THIN);
@@ -225,9 +185,6 @@ function select(sel) {
   selection = sel;
   if (!sel || !sel.fromSwitch) $('switch-table').querySelectorAll('.on').forEach(el => el.classList.remove('on')); // 改選別的就取消開關表的反白
   selLayer = sel ? thickLayer(selectedNets(sel), THIN) : null;
-  const key = selectedNets(sel).slice().sort((a, b) => a - b).join(',');
-  if (key !== detail.key) { detail.key = key; detail.rects = []; detail.drag = null; }
-  rebuildDetail();
   const d = sel && describe(sel);
   $('sel-what').textContent = d ? d.what : '無';
   $('sel-meta').textContent = d ? d.meta : '點圖上的元件或線條，或從下方元件清單挑一個。';
@@ -312,13 +269,6 @@ function draw() {
   if (hideGround()) ctx.drawImage(groundLayer, 0, 0);
   ctx.globalAlpha = selection ? 0.22 : 1; ctx.drawImage(overlay, 0, 0); ctx.globalAlpha = 1;
   if (selLayer) ctx.drawImage(selLayer.c, selLayer.x, selLayer.y);
-  if (detailLayer) ctx.drawImage(detailLayer.c, detailLayer.x, detailLayer.y);
-  const boxes = detail.drag ? [...detail.rects, normRect(detail.drag)] : detail.rects;
-  if (boxes.length) {
-    ctx.save(); ctx.setLineDash([6 / view.s, 4 / view.s]); ctx.strokeStyle = '#e04aa0'; ctx.lineWidth = 1.5 / view.s;
-    for (const [x0, y0, x1, y1] of boxes) ctx.strokeRect(x0, y0, x1 - x0 + 1, y1 - y0 + 1);
-    ctx.restore();
-  }
   if (hoverLayer && !(selection && selection.kind === 'net' && selection.k === hover.k)) ctx.drawImage(hoverLayer.c, hoverLayer.x, hoverLayer.y);
   if (selection && selection.kind === 'comp') for (const r of COMPONENTS[selection.i].hits) outline(r, '#2b2f33', 3);
   if (hover && hover.kind === 'comp' && !(selection && selection.kind === 'comp' && selection.i === hover.i)) for (const r of COMPONENTS[hover.i].hits) outline(r, 'rgba(43,47,51,.45)', 1.5);
@@ -352,15 +302,11 @@ const pts = new Map(); let moved = false, pinch = null;
 const local = e => { const r = viewer.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
 const toImage = ([cx, cy]) => [(cx - view.tx) / view.s, (cy - view.ty) / view.s];
 canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); pts.set(e.pointerId, local(e)); moved = false;
-  // 圈選細節：單指／左鍵拖曳畫框（不平移）
-  if (pts.size === 1 && e.button === 0 && detailMode()) { const [x, y] = toImage(local(e)); detail.drag = { id: e.pointerId, x0: x, y0: y, x1: x, y1: y }; }
-  else if (detail.drag) { detail.drag = null; draw(); }
   if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) }; } });
 canvas.addEventListener('pointermove', e => {
   const p = local(e);
   if (!pts.has(e.pointerId)) { if (e.pointerType === 'mouse') setHover(hitTest(...p)); return; }
   const prev = pts.get(e.pointerId); pts.set(e.pointerId, p);
-  if (detail.drag && detail.drag.id === e.pointerId) { [detail.drag.x1, detail.drag.y1] = toImage(p); draw(); return; }
   if (pts.size === 2 && pinch) {
     const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
     zoomAt(d / pinch.d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); pinch.d = d; moved = true; return;
@@ -369,18 +315,6 @@ canvas.addEventListener('pointermove', e => {
   if (moved || Math.abs(dx) + Math.abs(dy) > 3) { moved = true; viewer.classList.add('panning'); view.tx += dx; view.ty += dy; draw(); }
 });
 const end = e => {
-  if (detail.drag && detail.drag.id === e.pointerId) {
-    const r = normRect(detail.drag); detail.drag = null;
-    // 太小的框視為誤觸；圈選模式下單純點擊不改變選取，免得框好的範圍被清掉
-    if (e.type === 'pointerup' && r[2] - r[0] >= 2 && r[3] - r[1] >= 2) {
-      const before = detailPixels.length;
-      detail.rects.push(r); rebuildDetail();
-      if (detailPixels.length === before) { detail.rects.pop(); rebuildDetail(); saveMsg('框內沒有選取的線段（或已框過），換個位置再框', true); }
-      else saveMsg(`已圈選 ${detail.rects.length} 框，共 ${detailPixels.length} 個線段像素`);
-      updateSaveButtons();
-    }
-    pts.delete(e.pointerId); if (pts.size < 2) pinch = null; draw(); return;
-  }
   if (pts.has(e.pointerId) && !moved && pts.size === 1 && e.type === 'pointerup') {
     const hit = hitTest(...local(e));
     if (e.shiftKey && hit) addToSelection(hit);
@@ -582,20 +516,9 @@ const storeSaved = () => { try { localStorage.setItem(SAVED_KEY, JSON.stringify(
 const pickOf = k => { const p = nets[k].pixels[nets[k].pixels.length >> 1]; return [p % IW, (p / IW) | 0]; };
 const netsOf = entry => [...new Set(entry.picks.map(([x, y]) => label[y * IW + x]).filter(k => k >= 0))];
 // 名稱決定能做什麼：新名稱只能新增；已存在的名稱只能修改（覆蓋）或刪除
-// 選取與細節同名成對，各算一筆：savedIndex 找選取、detailIndex 找細節
-const isDetail = e => e.kind === 'detail';
-const savedIndex = name => saved.findIndex(e => e.name === name && !isDetail(e));
-const detailIndex = name => saved.findIndex(e => e.name === name && isDetail(e));
-const detailEntry = name => detailPixels.length
-  ? { name, kind: 'detail', savedAt: new Date().toISOString(), rects: detail.rects.map(r => [...r]), pixels: detailPixels.map(p => [...p]) }
-  : null;
-// 寫入（或移除）name 的細節：目前沒有圈選就刪掉舊的
-function putDetail(name) {
-  const e = detailEntry(name), i = detailIndex(name);
-  if (e && i >= 0) saved[i] = e; else if (e) saved.splice(savedIndex(name) + 1, 0, e); else if (i >= 0) saved.splice(i, 1);
-  return e;
-}
-const detailNote = e => e ? `＋細節 ${e.rects.length} 框／${e.pixels.length} 像素` : '';
+// 舊版「圈選細節」的項目（kind: 'detail'）：功能已淘汰，載入與匯入時略過
+const isDetail = e => e && e.kind === 'detail';
+const savedIndex = name => saved.findIndex(e => e.name === name);
 function updateSaveButtons() {
   const name = $('save-name').value.trim(), exists = name && savedIndex(name) >= 0, has = selectedNets(selection).length > 0;
   $('add-btn').disabled = !has || exists;
@@ -609,19 +532,17 @@ $('add-btn').onclick = () => {
   const name = $('save-name').value.trim() || (selection.kind === 'comp' ? COMPONENTS[selection.i].name : describe(selection).what);
   if (savedIndex(name) >= 0) return saveMsg(`「${name}」已經存在，要覆蓋請按「修改」`, true);
   saved.push({ name, savedAt: new Date().toISOString(), picks: ks.map(pickOf) });
-  const de = putDetail(name);
-  $('save-name').value = name; storeSaved(); renderSaved(); updateSaveButtons(); saveMsg(`已新增「${name}」（${ks.length} 條線路${detailNote(de)}）`);
+  $('save-name').value = name; storeSaved(); renderSaved(); updateSaveButtons(); saveMsg(`已新增「${name}」（${ks.length} 條線路）`);
 };
 $('update-btn').onclick = () => {
   const ks = selectedNets(selection), name = $('save-name').value.trim(), i = savedIndex(name);
   if (!ks.length || i < 0) return;
   saved[i] = { name, savedAt: new Date().toISOString(), picks: ks.map(pickOf) };
-  const de = putDetail(name);
-  storeSaved(); renderSaved(); saveMsg(`已修改「${name}」（${ks.length} 條線路${detailNote(de)}）`);
+  storeSaved(); renderSaved(); saveMsg(`已修改「${name}」（${ks.length} 條線路）`);
 };
 $('delete-btn').onclick = () => {
   const name = $('save-name').value.trim(), i = savedIndex(name);
-  if (i < 0 || !confirm(`刪除「${name}」${detailIndex(name) >= 0 ? '（含細節）' : ''}？`)) return;
+  if (i < 0 || !confirm(`刪除「${name}」？`)) return;
   saved = saved.filter(e => e.name !== name); $('save-name').value = '';
   storeSaved(); renderSaved(); updateSaveButtons(); saveMsg(`已刪除「${name}」`);
 };
@@ -635,16 +556,13 @@ function renderSaved() {
     const li = document.createElement('li'), name = document.createElement('span'), count = document.createElement('span');
     name.className = 'name'; name.textContent = entry.name;
     count.className = 'count';
-    count.textContent = isDetail(entry) ? ` 細節 ${entry.rects.length} 框／${entry.pixels.length} 像素` : ` ${entry.picks.length} 條`; name.append(count);
+    count.textContent = ` ${entry.picks.length} 條`; name.append(count);
     const go = document.createElement('button'); go.className = 'icon-btn'; go.type = 'button'; go.textContent = '載入';
-    // 選取與細節一起載入：先選線，再放回圈選的框
     go.onclick = () => {
-      const si = savedIndex(entry.name), di = detailIndex(entry.name);
-      const ks = si >= 0 ? netsOf(saved[si]) : [];
+      const ks = netsOf(entry);
       $('save-name').value = entry.name;
       select(!ks.length ? null : ks.length === 1 ? { kind: 'net', k: ks[0] } : { kind: 'multi', ks });
-      if (di >= 0 && ks.length) { detail.rects = saved[di].rects.map(r => [...r]); rebuildDetail(); updateSaveButtons(); draw(); }
-      saveMsg(`已載入「${entry.name}」${di >= 0 ? `（含細節 ${saved[di].rects.length} 框）` : ''}，可再 Shift＋點或勾「圈選細節」調整後按「修改」`);
+      saveMsg(`已載入「${entry.name}」，可再 Shift＋點調整後按「修改」`);
     };
     li.append(name, go); list.append(li);
   });
@@ -666,7 +584,7 @@ $('import-btn').onclick = () => $('import-file').click();
 $('import-file').onchange = async e => {
   const file = e.target.files[0]; e.target.value = '';
   if (!file) return;
-  let entries, details;
+  let entries, details = 0;
   try {
     const data = JSON.parse(await file.text());
     if (data.diagram && data.diagram !== DIAGRAM.id) throw new Error(`這是 ${data.diagram} 的選取，目前開的是 ${DIAGRAM.id}`);
@@ -676,48 +594,29 @@ $('import-file').onchange = async e => {
       name: String(x.name || '').trim(), savedAt: x.savedAt || new Date().toISOString(),
       picks: (x.picks || (x.nets || []).map(n => n.pick)).filter(validPick),
     })).filter(x => x.name && x.picks.length);
-    // 細節：匯出檔放在 details，localStorage 原始陣列則混在同一個陣列（kind: 'detail'）
-    const validRect = r => Array.isArray(r) && r.length === 4 && validPick(r.slice(0, 2)) && validPick(r.slice(2));
-    details = [...(data.details || []), ...list.filter(isDetail)].map(x => ({
-      name: String(x.name || '').trim(), kind: 'detail', savedAt: x.savedAt || new Date().toISOString(),
-      rects: (x.rects || []).filter(validRect), pixels: (x.pixels || []).filter(validPick),
-    })).filter(x => x.name && x.rects.length && x.pixels.length);
+    // 舊版匯出檔的細節（details，或陣列中 kind: 'detail' 的項目）：功能已淘汰，只計數
+    details = (Array.isArray(data.details) ? data.details.length : 0) + list.filter(isDetail).length;
   } catch (err) { return saveMsg(`匯入失敗：${err.message}`, true); }
   let added = 0, skipped = 0, renamed = 0;
-  const rename = new Map(); // 匯入的選取若同名改名，成對的細節跟著改
   for (const entry of entries) {
-    const i = savedIndex(entry.name), orig = entry.name;
+    const i = savedIndex(entry.name);
     if (i >= 0 && samePicks(saved[i].picks, entry.picks)) { skipped++; continue; }
     if (i >= 0) {
       let name = `${entry.name}（匯入）`, n = 2;
       while (savedIndex(name) >= 0) name = `${entry.name}（匯入 ${n++}）`;
       entry.name = name; renamed++;
     }
-    rename.set(orig, entry.name);
     saved.push(entry); added++;
   }
-  // 細節只跟著新加入的選取進來；選取已存在（略過）時保留現有的細節
-  for (const d of details) {
-    if (!rename.has(d.name)) { skipped++; continue; }
-    d.name = rename.get(d.name);
-    const i = detailIndex(d.name); if (i >= 0) saved[i] = d; else saved.splice(savedIndex(d.name) + 1, 0, d);
-    added++;
-  }
   storeSaved(); renderSaved(); updateSaveButtons();
-  saveMsg(`匯入 ${added} 筆` + (renamed ? `（其中 ${renamed} 筆同名改名）` : '') + (skipped ? `，${skipped} 筆已存在略過` : ''));
+  saveMsg(`匯入 ${added} 筆` + (renamed ? `（其中 ${renamed} 筆同名改名）` : '') + (skipped ? `，${skipped} 筆已存在略過` : '') + (details ? `，略過 ${details} 筆細節（功能已淘汰）` : ''));
 };
 
 // 匯出：每條線附上線色、外框、線段座標與連接的元件，方便離開這個頁面後判讀
 $('export-btn').onclick = () => {
   const out = {
     source: DIAGRAM.source, diagram: DIAGRAM.id, imageSize: [IW, IH], exportedAt: new Date().toISOString(),
-    // 細節另放 details（與同名的 selections 成對），selections 維持原格式，驗收腳本照舊可讀
-    details: saved.filter(isDetail).map(e => ({
-      name: e.name, savedAt: e.savedAt, rects: e.rects, pixelCount: e.pixels.length,
-      nets: [...new Set(e.pixels.map(([x, y]) => label[y * IW + x]).filter(k => k >= 0))].map(k => ({ id: k, code: nets[k].code, pick: pickOf(k) })),
-      pixels: e.pixels,
-    })),
-    selections: saved.filter(e => !isDetail(e)).map(entry => ({
+    selections: saved.map(entry => ({
       name: entry.name, savedAt: entry.savedAt,
       nets: netsOf(entry).map(k => {
         const n = nets[k];

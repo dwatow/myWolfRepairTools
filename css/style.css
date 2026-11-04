@@ -142,6 +142,5 @@ aside h2 { font-size: 13px; font-weight: 700; margin: 0; letter-spacing: .04em; 
 .list.saved .name { font-family: inherit; font-size: 13px; }
 .list.saved .count { color: var(--muted); font-size: 12px; }
 .save-actions.io { margin-top: 8px; }
-.detail-row { align-items: center; }
 details summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
 details[open] summary { margin-bottom: 8px; }
